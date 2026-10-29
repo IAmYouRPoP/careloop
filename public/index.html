@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CareLoop</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230f766e'/><path d='M9 16h4l2-5 3 10 2-5h3' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <script>
+    // Apply the saved theme before first paint so dark mode doesn't flash white.
+    try {
+      const pick = localStorage.getItem('cl_theme');
+      if (pick ? pick === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
+    } catch {}
+  </script>
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'Noto Sans Devanagari', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+          colors: { brand: { 50: '#f0fdfa', 100: '#ccfbf1', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a' } },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { -webkit-font-smoothing: antialiased; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border-radius: .6rem; padding: .55rem 1rem; font-weight: 600; font-size: .9rem; transition: background .15s, box-shadow .15s; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: #0f766e; color: #fff; } .btn-primary:hover:not(:disabled) { background: #115e59; }
+    .btn-ghost { background: #fff; color: #0f172a; box-shadow: inset 0 0 0 1px #cbd5e1; } .btn-ghost:hover:not(:disabled) { background: #f8fafc; }
+    .btn-danger { background: #fff; color: #b91c1c; box-shadow: inset 0 0 0 1px #fecaca; } .btn-danger:hover:not(:disabled) { background: #fef2f2; }
+    .btn-sm { padding: .3rem .65rem; font-size: .8rem; border-radius: .5rem; }
+    .input { width: 100%; border-radius: .6rem; border: 1px solid #cbd5e1; padding: .55rem .75rem; font-size: .9rem; background: #fff; }
+    .input:focus { outline: 2px solid #14b8a6; outline-offset: -1px; border-color: transparent; }
+    .label { display: block; font-size: .8rem; font-weight: 600; color: #334155; margin-bottom: .3rem; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; }
+    .badge { display: inline-flex; align-items: center; gap: .3rem; border-radius: 999px; padding: .15rem .6rem; font-size: .75rem; font-weight: 600; white-space: nowrap; }
+    .nav-link { padding: .4rem .7rem; border-radius: .5rem; font-size: .875rem; font-weight: 500; color: #475569; white-space: nowrap; }
+    .nav-link:hover { background: #f1f5f9; color: #0f172a; }
+    .nav-link.active { background: #f0fdfa; color: #0f766e; }
+    table.data { width: 100%; font-size: .875rem; }
+    table.data th { text-align: left; font-weight: 600; color: #64748b; font-size: .75rem; text-transform: uppercase; letter-spacing: .03em; padding: .6rem .75rem; border-bottom: 1px solid #e2e8f0; }
+    table.data td { padding: .65rem .75rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(20,184,166,.5); } 100% { box-shadow: 0 0 0 18px rgba(20,184,166,0); } }
+    .pulse { animation: pulse-ring 1.6s ease-out infinite; }
+    @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+
+    /* Dark mode: remaps the light palette used across the app (toggled by the ◐ button). */
+    html.dark { color-scheme: dark; }
+    html.dark body { background: #0b1220; color: #e2e8f0; }
+    html.dark .bg-white, html.dark .card, html.dark .btn-ghost, html.dark .input { background-color: #111a2b; }
+    html.dark .bg-white\/90 { background-color: rgba(11,18,32,.9); }
+    html.dark .bg-slate-50 { background-color: #0f1828; }
+    html.dark .bg-slate-100 { background-color: #1a2436; }
+    html.dark .hover\:bg-slate-50:hover, html.dark .hover\:bg-slate-100:hover, html.dark .btn-ghost:hover:not(:disabled), html.dark .nav-link:hover { background-color: #1a2436; }
+    html.dark .card, html.dark .border-slate-200, html.dark .border-slate-100, html.dark .divide-slate-100 > * + *, html.dark table.data th, html.dark table.data td { border-color: #243045; }
+    html.dark .input { border-color: #334155; color: #e2e8f0; }
+    html.dark .btn-ghost { color: #e2e8f0; box-shadow: inset 0 0 0 1px #334155; }
+    html.dark .text-slate-900 { color: #f1f5f9; }
+    html.dark .text-slate-700, html.dark .text-slate-600, html.dark .label { color: #cbd5e1; }
+    html.dark .text-slate-500 { color: #94a3b8; }
+    html.dark .text-slate-400 { color: #7c8aa0; }
+    html.dark .nav-link { color: #94a3b8; }
+    html.dark .nav-link.active, html.dark .bg-brand-50 { background-color: rgba(20,184,166,.14); color: #5eead4; }
+    html.dark .text-brand-700 { color: #5eead4; }
+    html.dark .bg-emerald-50 { background-color: rgba(16,185,129,.14); } html.dark .text-emerald-700, html.dark .text-emerald-800 { color: #6ee7b7; }
+    html.dark .bg-red-50, html.dark .bg-red-50\/60, html.dark .bg-red-50\/50 { background-color: rgba(239,68,68,.14); } html.dark .text-red-700, html.dark .text-red-800 { color: #fca5a5; }
+    html.dark .bg-amber-50 { background-color: rgba(245,158,11,.14); } html.dark .text-amber-700, html.dark .text-amber-800, html.dark .text-amber-900 { color: #fcd34d; }
+    html.dark .bg-sky-50 { background-color: rgba(14,165,233,.14); } html.dark .text-sky-700, html.dark .text-sky-800 { color: #7dd3fc; }
+    html.dark .ring-slate-200, html.dark .ring-emerald-200, html.dark .ring-red-200, html.dark .ring-amber-200, html.dark .ring-sky-200, html.dark .ring-brand-100 { --tw-ring-color: rgba(148,163,184,.25); }
+    html.dark .btn-danger { background: transparent; color: #fca5a5; box-shadow: inset 0 0 0 1px rgba(239,68,68,.45); }
+    html.dark svg text[fill="#64748b"] { fill: #94a3b8; }
+    html.dark svg line[stroke="#e2e8f0"] { stroke: #243045; }
+    html.dark .h-3\.5.bg-slate-100 { background-color: #1a2436; }
+
+    /* Print / Save as PDF: hide navigation and buttons, keep the content. */
+    @media print {
+      header, footer, #toasts, .btn, .print\:hidden, details > summary { display: none !important; }
+      body { background: #fff !important; color: #000 !important; }
+      .card { break-inside: avoid; box-shadow: none !important; }
+      main { max-width: none !important; padding: 0 !important; }
+      details { display: block; } details > *:not(summary) { display: block !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <div id="app"></div>
+  <div id="toasts" class="fixed bottom-4 right-4 left-4 sm:left-auto z-50 flex flex-col gap-2 items-end"></div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

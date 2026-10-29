@@ -1,0 +1,25 @@
+# Render blueprint: New + > Blueprint, pick this repo. Free plan: the service sleeps when idle and
+# starts with fresh demo data each time (no persistent disk). For data that survives restarts,
+# switch to a paid plan, uncomment the disk block, and set DATA_DIR to its mount path.
+services:
+  - type: web
+    name: careloop
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/v1/features
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_VERSION
+        value: "22"
+      - key: PUBLIC_URL
+        sync: false
+    # disk:
+    #   name: careloop-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # (then add: - key: DATA_DIR / value: /var/data)

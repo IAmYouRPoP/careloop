@@ -1,0 +1,46 @@
+// Condition lookup: short plain-language summaries with common symptoms and links to trusted
+// sources. General information only, written for this demo; every link was checked on 2026-10-29.
+// `urgent` marks emergencies; `aka` holds other names people search for.
+
+const M = (slug) => ({ name: 'MedlinePlus', url: `https://medlineplus.gov/${slug}.html` });
+const N = (slug) => ({ name: 'NHS', url: `https://www.nhs.uk/${slug}/` });
+const W = (slug) => ({ name: 'WHO', url: `https://www.who.int/news-room/fact-sheets/detail/${slug}` });
+
+export const CONDITIONS = [
+  { name: 'Heart attack', urgent: true, department: 'Cardiology', summary: 'Blood flow to part of the heart is blocked. It is an emergency.', symptoms: ['Chest pain or pressure', 'Pain spreading to arm, jaw or back', 'Shortness of breath', 'Sweating, nausea'], sources: [M('heartattack'), N('conditions/heart-attack')] },
+  { name: 'Stroke', urgent: true, department: 'Neurology', summary: 'Blood supply to part of the brain is cut off. Every minute counts.', symptoms: ['Face drooping', 'Arm or leg weakness on one side', 'Slurred speech', 'Sudden confusion or vision loss'], sources: [M('stroke'), N('conditions/stroke')] },
+  { name: 'Diabetes', department: 'General Medicine', summary: 'Blood sugar stays too high because the body makes too little insulin or cannot use it well.', symptoms: ['Feeling very thirsty', 'Urinating often', 'Tiredness', 'Weight loss', 'Blurred vision'], sources: [M('diabetes'), N('conditions/diabetes')] },
+  { name: 'High blood pressure', aka: ['hypertension', 'bp'], department: 'Cardiology', summary: 'Blood pushes too hard against artery walls. It often has no symptoms, so regular checks matter.', symptoms: ['Often none', 'Headaches (sometimes)', 'Blurred vision (sometimes)'], sources: [M('highbloodpressure'), N('conditions/high-blood-pressure-hypertension')] },
+  { name: 'Asthma', department: 'Pulmonology', summary: 'The airways become narrow and inflamed, making breathing harder at times.', symptoms: ['Wheezing', 'Breathlessness', 'Tight chest', 'Coughing, often at night'], sources: [M('asthma'), N('conditions/asthma')] },
+  { name: 'Migraine', department: 'Neurology', summary: 'Repeated, often one-sided headaches that can last hours to days.', symptoms: ['Throbbing headache', 'Feeling sick', 'Sensitivity to light or sound', 'Visual disturbances (aura)'], sources: [M('migraine'), N('conditions/migraine')] },
+  { name: 'Common cold', department: 'General Medicine', summary: 'A mild viral infection of the nose and throat that usually clears in about a week.', symptoms: ['Runny or blocked nose', 'Sneezing', 'Sore throat', 'Mild cough'], sources: [M('commoncold'), N('conditions/common-cold')] },
+  { name: 'Flu (influenza)', aka: ['influenza'], department: 'General Medicine', summary: 'A viral infection that comes on quickly and feels worse than a cold.', symptoms: ['Sudden fever', 'Body aches', 'Tiredness', 'Dry cough', 'Sore throat'], sources: [M('flu'), N('conditions/flu')] },
+  { name: 'Dengue', department: 'General Medicine', summary: 'A mosquito-borne viral infection common in tropical regions; some cases become severe.', symptoms: ['High fever', 'Severe headache', 'Pain behind the eyes', 'Muscle and joint pain', 'Rash'], sources: [M('dengue'), W('dengue-and-severe-dengue')] },
+  { name: 'Malaria', department: 'General Medicine', summary: 'A parasite spread by mosquito bites. It needs prompt testing and treatment.', symptoms: ['Fever with chills', 'Headache', 'Sweating', 'Vomiting'], sources: [M('malaria'), W('malaria')] },
+  { name: 'Typhoid', department: 'General Medicine', summary: 'A bacterial infection spread through contaminated food or water.', symptoms: ['Prolonged fever', 'Tiredness', 'Stomach pain', 'Headache', 'Constipation or diarrhoea'], sources: [W('typhoid')] },
+  { name: 'Tuberculosis (TB)', aka: ['tb'], department: 'Pulmonology', summary: 'A bacterial infection that usually affects the lungs and spreads through the air.', symptoms: ['Cough lasting over 2 weeks', 'Coughing up blood', 'Night sweats', 'Weight loss', 'Fever'], sources: [M('tuberculosis'), W('tuberculosis')] },
+  { name: 'Gastroenteritis', aka: ['stomach bug', 'food poisoning'], department: 'Gastroenterology', summary: 'An infection of the stomach and gut, usually short-lived. Keeping fluids up is important.', symptoms: ['Diarrhoea', 'Vomiting', 'Stomach cramps', 'Mild fever'], sources: [M('gastroenteritis'), N('conditions/diarrhoea-and-vomiting')] },
+  { name: 'Acid reflux (GERD)', aka: ['gerd', 'heartburn', 'acidity'], department: 'Gastroenterology', summary: 'Stomach acid comes back up into the food pipe.', symptoms: ['Burning in the chest after eating', 'Sour taste in the mouth', 'Bloating', 'Cough or hoarse voice'], sources: [M('gerd'), N('conditions/heartburn-and-acid-reflux')] },
+  { name: 'Urinary tract infection (UTI)', aka: ['uti', 'urine infection'], department: 'Urology', summary: 'An infection in the bladder or urinary tract, more common in women.', symptoms: ['Burning when urinating', 'Needing to urinate often', 'Cloudy or smelly urine', 'Lower tummy pain'], sources: [M('urinarytractinfections'), N('conditions/urinary-tract-infections-utis')] },
+  { name: 'Kidney stones', department: 'Urology', summary: 'Hard deposits form in the kidneys and can cause severe pain as they move.', symptoms: ['Severe pain in the side or back', 'Pain spreading to the groin', 'Blood in urine', 'Nausea'], sources: [M('kidneystones'), N('conditions/kidney-stones')] },
+  { name: 'Conjunctivitis (pink eye)', aka: ['pink eye', 'eye flu'], department: 'Ophthalmology', summary: 'Inflammation of the thin layer covering the eye, often from infection or allergy.', symptoms: ['Red eye', 'Itchy or gritty eyes', 'Watery eyes', 'Sticky discharge'], sources: [M('pinkeye'), N('conditions/conjunctivitis')] },
+  { name: 'Anxiety', department: 'Psychiatry', summary: 'Worry or fear that is hard to control and affects daily life. It is common and treatable.', symptoms: ['Constant worry', 'Restlessness', 'Fast heartbeat', 'Trouble sleeping', 'Panic attacks'], sources: [M('anxiety'), N('mental-health/conditions/generalised-anxiety-disorder')] },
+  { name: 'Depression', department: 'Psychiatry', summary: 'Low mood and loss of interest lasting weeks or longer. Help works; please reach out.', symptoms: ['Low mood most days', 'Loss of interest', 'Tiredness', 'Sleep changes', 'Feeling hopeless'], sources: [M('depression'), N('mental-health/conditions/depression-in-adults')] },
+  { name: 'Insomnia', department: 'Psychiatry', summary: 'Regular trouble falling or staying asleep.', symptoms: ['Difficulty falling asleep', 'Waking up often', 'Tiredness in the day', 'Irritability'], sources: [M('insomnia'), N('conditions/insomnia')] },
+  { name: 'Back pain', department: 'Orthopaedics', summary: 'Very common; most back pain improves within weeks with gentle activity.', symptoms: ['Lower back ache', 'Stiffness', 'Pain on bending or lifting'], sources: [M('backpain'), N('conditions/back-pain')] },
+  { name: 'Arthritis', department: 'Orthopaedics', summary: 'Inflammation of the joints causing pain and stiffness.', symptoms: ['Joint pain', 'Swelling', 'Stiffness, especially in the morning', 'Reduced movement'], sources: [M('arthritis'), N('conditions/arthritis')] },
+  { name: 'Eczema', department: 'Dermatology', summary: 'Skin becomes itchy, dry and inflamed, often in patches.', symptoms: ['Itchy skin', 'Dry, cracked patches', 'Redness', 'Rash'], sources: [M('eczema'), N('conditions/atopic-eczema')] },
+  { name: 'Chickenpox', department: 'Paediatrics', summary: 'A common childhood viral infection with an itchy spotty rash.', symptoms: ['Itchy spots that blister', 'Fever', 'Tiredness', 'Loss of appetite'], sources: [M('chickenpox'), N('conditions/chickenpox')] },
+  { name: 'Anaemia', aka: ['anemia', 'low iron'], department: 'General Medicine', summary: 'Too few healthy red blood cells, often from low iron.', symptoms: ['Tiredness', 'Pale skin', 'Shortness of breath', 'Dizziness'], sources: [M('anemia'), N('conditions/iron-deficiency-anaemia')] },
+  { name: 'Hepatitis', aka: ['jaundice', 'liver infection'], department: 'Gastroenterology', summary: 'Inflammation of the liver, often caused by a virus.', symptoms: ['Yellow skin or eyes (jaundice)', 'Dark urine', 'Tiredness', 'Stomach pain'], sources: [M('hepatitis'), W('hepatitis-b')] },
+  { name: 'Sinusitis', department: 'ENT', summary: 'The sinuses become swollen, often after a cold.', symptoms: ['Blocked nose', 'Pain around the eyes or cheeks', 'Thick nasal discharge', 'Reduced sense of smell'], sources: [M('sinusitis'), N('conditions/sinusitis-sinus-infection')] },
+  { name: 'Tooth decay', aka: ['cavity', 'toothache'], department: 'Dentistry', summary: 'Damage to teeth from plaque and sugar, which can lead to holes and pain.', symptoms: ['Toothache', 'Sensitive teeth', 'Visible holes or dark spots', 'Bad breath'], sources: [M('toothdecay'), N('conditions/tooth-decay')] },
+];
+
+export function searchConditions(q) {
+  const s = String(q || '').trim().toLowerCase();
+  if (!s) return CONDITIONS;
+  return CONDITIONS.filter((c) =>
+    [c.name, ...(c.aka || []), ...c.symptoms, c.department].some((t) => t.toLowerCase().includes(s))
+  );
+}
