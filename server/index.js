@@ -43,10 +43,17 @@ if (DEMO_MODE) {
     process.exit(1);
   }
   if (!(await one('SELECT 1 FROM departments LIMIT 1'))) {
-    const email = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-    const password = process.env.ADMIN_PASSWORD || '';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || password.length < 12) {
-      console.error('Live mode needs ADMIN_EMAIL and ADMIN_PASSWORD (12+ characters) to create the first admin account.');
+    // Tolerate surrounding spaces or quotes from copy-paste; say which setting is wrong, never its value.
+    const clean = (v) => String(v || '').trim().replace(/^(["'])(.*)\1$/, '$2');
+    const email = clean(process.env.ADMIN_EMAIL).toLowerCase();
+    const password = clean(process.env.ADMIN_PASSWORD);
+    const problems = [];
+    if (!email) problems.push('ADMIN_EMAIL is not set');
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) problems.push('ADMIN_EMAIL is not a valid email address');
+    if (!password) problems.push('ADMIN_PASSWORD is not set');
+    else if (password.length < 12) problems.push(`ADMIN_PASSWORD has ${password.length} characters; it needs at least 12`);
+    if (problems.length) {
+      console.error(`Live mode can't create the first admin account: ${problems.join('; ')}.`);
       process.exit(1);
     }
     await seedIfEmpty({ demo: false, admin: { email, password, name: process.env.ADMIN_NAME || 'Administrator' } });

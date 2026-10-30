@@ -22,6 +22,9 @@ export function cleanDatabaseUrl(raw) {
   }
   // node-postgres doesn't need libpq's channel_binding flag; drop it so it can't confuse older drivers.
   url.searchParams.delete('channel_binding');
+  // node-postgres already treats require/prefer/verify-ca as verify-full (encrypted and certificate
+  // checked) and warns that this will change; ask for verify-full explicitly to keep that behaviour.
+  if (['require', 'prefer', 'verify-ca'].includes(url.searchParams.get('sslmode'))) url.searchParams.set('sslmode', 'verify-full');
   return url.toString();
 }
 
