@@ -75,14 +75,14 @@ function shell(path) {
     ${FEATURES.demo ? `<div class="bg-slate-900 text-slate-200 text-xs text-center px-4 py-2">${t('Demo site with sample data.')} ${S.user ? '' : `<a href="#/login" class="font-semibold text-white underline underline-offset-2">${t('Try the demo accounts')}</a>`}</div>` : ''}
     <header class="site-header sticky top-0 z-40 border-b backdrop-blur-md">
       <div class="max-w-6xl mx-auto px-4 py-2 lg:py-0 lg:h-16 flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1">
-        <a href="${homeFor(S.user)}" class="flex items-center gap-2.5 font-semibold text-[1.05rem] tracking-tight shrink-0">
+        <a href="${homeFor(S.user)}" class="flex items-center gap-2.5 font-semibold text-[1.05rem] tracking-tight shrink-0" aria-label="CareLoop home">
           <svg viewBox="0 0 32 32" class="h-8 w-8 drop-shadow-sm" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14b8a6"/><stop offset="1" stop-color="#0f766e"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="9" fill="url(#lg)"/><path d="M8.5 16h4l2.2-5.2 3.2 10.4 2.2-5.2h3.4" stroke="white" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          CareLoop
+          <span class="max-[400px]:hidden">CareLoop</span>
         </a>
         <nav class="no-scrollbar order-last w-full lg:order-none lg:w-auto lg:flex-1 min-w-0 flex gap-1 overflow-x-auto -mx-1 px-1 pb-1 lg:pb-0" aria-label="Main">
           ${links.map(([href, label]) => `<a href="${href}" class="nav-link ${active(href) ? 'active' : ''}">${t(label)}</a>`).join('')}
         </nav>
-        <div class="flex items-center gap-2 shrink-0 ml-auto lg:ml-0">
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto lg:ml-0">
           ${S.user?.role && S.user.role !== 'patient' ? '' : `<button id="lang" class="btn btn-ghost btn-sm" title="Language / भाषा">${getLang() === 'hi' ? 'English' : 'हिन्दी'}</button>`}
           <button id="theme" class="btn btn-ghost btn-sm" aria-label="Switch light or dark mode" title="Light / dark">◐</button>
           ${S.user ? `
@@ -134,6 +134,9 @@ async function render() {
   window.scrollTo(0, 0);
   try {
     await route.view(el, params);
+    // Browser tab title: the page's own heading, e.g. "Book a visit · CareLoop".
+    const heading = el.querySelector('h1')?.textContent.trim();
+    document.title = path === '/' || !heading ? 'CareLoop · Hospital visits, without the guesswork' : `${heading} · CareLoop`;
   } catch (e) {
     el.innerHTML = `<div class="card p-8 text-center"><p class="font-semibold">Couldn’t load this page</p><p class="text-slate-500 text-sm mt-1">${esc(e.message)}</p><a href="${homeFor(S.user)}" class="btn btn-ghost mt-4">Go home</a></div>`;
     if (!/sign in/i.test(e.message)) toast(e.message, 'error');

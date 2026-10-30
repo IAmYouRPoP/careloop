@@ -1,6 +1,6 @@
 // Phase 4 views: slot rescue offers (patient) and the analytics dashboard (admin).
 import {
-  api, esc, fmtDT, fmtTime, localDate, badge, toast, busy, pageTitle, empty, onUserEvent, onCleanup, t,
+  api, esc, fmtDT, fmtTime, localDate, badge, toast, busy, pageTitle, empty, onUserEvent, onCleanup, t, humanize,
 } from './lib.js';
 
 // ---------- slot offers ----------
@@ -107,7 +107,7 @@ export async function symptomTest(el) {
               <td class="max-w-sm">${esc(x.text)}</td>
               <td>${x.expect === 'emergency' ? badge('Emergency', 'red') : esc(x.expect)}</td>
               <td>${x.got === 'emergency' ? badge('Emergency', 'red') : esc(x.got)}</td>
-              <td class="text-xs text-slate-500">${x.matched.map((m) => esc(m.replace(/_/g, ' '))).join(', ') || '–'}${x.aiFound?.length ? `<div class="text-brand-700">AI: ${x.aiFound.map(esc).join(', ')}</div>` : ''}${x.aiError ? `<div class="text-amber-700">${esc(x.aiError)}</div>` : ''}</td>
+              <td class="text-xs text-slate-500">${esc(humanize(x.matched.join(', ').replace(/_/g, ' '))) || '–'}${x.aiFound?.length ? `<div class="text-brand-700">AI: ${esc(x.aiFound.join(', ').replace(/_/g, ' '))}</div>` : ''}${x.aiError ? `<div class="text-amber-700">${esc(x.aiError)}</div>` : ''}</td>
               <td>${x.pass ? badge('Pass', 'green') : badge('Fail', 'red')}</td>
             </tr>`).join('')}
           </tbody>

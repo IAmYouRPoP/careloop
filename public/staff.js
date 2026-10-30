@@ -1,7 +1,7 @@
 // Staff dashboard, waiting-room display, and admin pages.
 import {
   S, api, esc, fmtDT, fmtTime, fmtDate, localDate, badge, visitBadge, readinessBadge, tokenBadge, urgencyBadge,
-  itemBadge, toast, busy, pageTitle, empty, formData, joinRoom, onCleanup,
+  itemBadge, toast, busy, pageTitle, empty, formData, joinRoom, onCleanup, humanize,
 } from './lib.js';
 
 // Staff work in their own department; admins pick one (remembered).
@@ -474,7 +474,7 @@ export async function adminRules(el) {
         <thead><tr><th>Symptom</th><th>Matches</th><th>Department</th><th>Urgency</th><th>Reviewed by</th><th></th></tr></thead>
         <tbody>${rules.map((r) => `
           <tr class="${r.is_red_flag ? 'bg-red-50/50' : ''}">
-            <td class="font-medium whitespace-nowrap">${r.is_red_flag ? '🚩 ' : ''}${esc(r.symptom_key.replace(/_/g, ' '))}</td>
+            <td class="font-medium whitespace-nowrap">${r.is_red_flag ? '🚩 ' : ''}${esc(humanize(r.symptom_key))}</td>
             <td class="text-slate-500 text-xs max-w-xs">${r.synonyms.map(esc).join(', ')}</td>
             <td>${r.is_red_flag ? '<span class="text-red-700 font-semibold text-xs">Emergency</span>' : esc(r.department_name || '–')}</td>
             <td>${urgencyBadge(r.urgency)}</td>

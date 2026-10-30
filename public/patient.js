@@ -2,9 +2,10 @@
 import {
   S, api, setSession, esc, fmtDT, fmtTime, fmtDate, localDate, isToday, qs, badge, visitBadge, readinessBadge,
   tokenBadge, urgencyBadge, itemBadge, URGENCY, toast, busy, pageTitle, empty, formData, joinRoom, SYNTHETIC_NOTE,
-  t, setLang, ordinal,
+  t, setLang, ordinal, humanize,
 } from './lib.js';
 import { offerBanner } from './insights.js';
+import { phoneField, readPhone } from './phone.js';
 
 // Oldest date of birth the forms accept (120 years ago); the server enforces the same range.
 const dobMin = () => { const d = new Date(); d.setFullYear(d.getFullYear() - 120); return localDate(d); };
@@ -205,10 +206,8 @@ export async function signup(el) {
         <form id="f" class="mt-6 space-y-4">
           <div><label class="label" for="n">${t('Full name')}</label><input class="input" id="n" name="full_name" required maxlength="100" autocomplete="name" /></div>
           <div><label class="label" for="e">Email</label><input class="input" id="e" name="email" type="email" required autocomplete="email" /></div>
-          <div class="grid grid-cols-2 gap-3">
-            <div><label class="label" for="ph">Phone <span class="font-normal text-slate-400">(optional)</span></label><input class="input" id="ph" name="phone" autocomplete="tel" /></div>
-            <div><label class="label" for="dob">${t('Date of birth')}</label><input class="input" id="dob" name="date_of_birth" type="date" min="${dobMin()}" max="${localDate()}" /></div>
-          </div>
+          ${phoneField({ id: 'ph', label: 'Phone' })}
+          <div><label class="label" for="dob">${t('Date of birth')} <span class="font-normal text-slate-400">(optional)</span></label><input class="input" id="dob" name="date_of_birth" type="date" min="${dobMin()}" max="${localDate()}" /></div>
           <div><label class="label" for="p">${t('Password')}</label><input class="input" id="p" name="password" type="password" minlength="8" maxlength="72" required autocomplete="new-password" /><p class="text-xs text-slate-500 mt-1">At least 8 characters.</p></div>
           <button class="btn btn-primary w-full">Create account</button>
         </form>
@@ -221,7 +220,9 @@ export async function signup(el) {
   el.querySelector('#f').addEventListener('submit', (e) => {
     e.preventDefault();
     busy(e.submitter, async () => {
-      const r = await api('/auth/signup', { method: 'POST', body: formData(e.target) });
+      const body = formData(e.target);
+      body.phone = readPhone(body);
+      const r = await api('/auth/signup', { method: 'POST', body });
       setSession(r.token, r.user);
       toast('Welcome to CareLoop');
       location.hash = '#/home';
@@ -235,10 +236,8 @@ export async function profile(el) {
     ${pageTitle('Profile', esc(me.email))}
     <form id="f" class="card p-6 max-w-xl space-y-4">
       <div><label class="label" for="n">${t('Full name')}</label><input class="input" id="n" name="full_name" value="${esc(me.full_name)}" required maxlength="100" autocomplete="name" /></div>
-      <div class="grid sm:grid-cols-2 gap-3">
-        <div><label class="label" for="ph">Phone</label><input class="input" id="ph" name="phone" value="${esc(me.phone || '')}" placeholder="+91 98765 43210" autocomplete="tel" /></div>
-        <div><label class="label" for="dob">${t('Date of birth')}</label><input class="input" id="dob" name="date_of_birth" type="date" min="${dobMin()}" max="${localDate()}" value="${esc(me.dob_ymd || '')}" /></div>
-      </div>
+      ${phoneField({ id: 'ph', label: 'Phone', value: me.phone || '' })}
+      <div class="max-w-xs"><label class="label" for="dob">${t('Date of birth')}</label><input class="input" id="dob" name="date_of_birth" type="date" min="${dobMin()}" max="${localDate()}" value="${esc(me.dob_ymd || '')}" /></div>
       <div class="text-sm text-slate-500">Role: ${badge(me.role, 'teal')} ${me.department_name ? `· ${esc(me.department_name)}` : ''}</div>
       <button class="btn btn-primary">Save changes</button>
     </form>
@@ -259,7 +258,9 @@ export async function profile(el) {
   el.querySelector('#f').addEventListener('submit', (e) => {
     e.preventDefault();
     busy(e.submitter, async () => {
-      const u = await api('/me', { method: 'PATCH', body: formData(e.target) });
+      const body = formData(e.target);
+      body.phone = readPhone(body);
+      const u = await api('/me', { method: 'PATCH', body });
       setSession(S.token, { ...S.user, full_name: u.full_name });
       toast('Profile saved');
     });
@@ -314,7 +315,7 @@ export async function symptoms(el) {
 
 function renderAssessment(r, text) {
   const matched = r.matched.length
-    ? `<p class="text-xs text-slate-500 mt-3">${t('Recognised:')} ${r.matched.map((m) => esc(m.replace(/_/g, ' '))).join(', ')}${r.aiFound?.length ? ` <span class="text-brand-700">(AI helped with: ${r.aiFound.map((m) => esc(m.replace(/_/g, ' '))).join(', ')})</span>` : ''}</p>` : '';
+    ? `<p class="text-xs text-slate-500 mt-3">${t('Recognised:')} ${esc(humanize(r.matched.join(', ')))}${r.aiFound?.length ? ` <span class="text-brand-700">(AI helped with: ${esc(r.aiFound.join(', ').replace(/_/g, ' '))})</span>` : ''}</p>` : '';
   if (r.emergency) {
     return `
       <div class="rounded-2xl bg-red-600 text-white p-6 shadow-lg">
@@ -324,7 +325,7 @@ function renderAssessment(r, text) {
           <a href="tel:112" class="btn bg-white text-red-700 hover:bg-red-50">${t('Call 112')}</a>
           <a href="tel:108" class="btn bg-white/10 text-white ring-1 ring-white/60 hover:bg-white/20">${t('Call 108 (ambulance)')}</a>
         </div>
-        <p class="text-xs mt-4 opacity-90">${r.matched.map((m) => esc(m.replace(/_/g, ' '))).join(', ')}</p>
+        <p class="text-xs mt-4 opacity-90">${esc(humanize(r.matched.join(', ').replace(/_/g, ' ')))}</p>
       </div>`;
   }
   const u = URGENCY[r.urgency];

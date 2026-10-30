@@ -119,7 +119,12 @@ const TONES = {
   teal: 'bg-brand-50 text-brand-700 ring-1 ring-brand-100',
   gray: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
 };
-export const badge = (text, tone = 'gray') => `<span class="badge ${TONES[tone]}">${esc(t(text))}</span>`;
+// First letter upper-case: "patient" → "Patient", "chest_pain" → "Chest pain".
+export const humanize = (s) => {
+  const x = String(s ?? '').replace(/_/g, ' ');
+  return x.charAt(0).toUpperCase() + x.slice(1);
+};
+export const badge = (text, tone = 'gray') => `<span class="badge ${TONES[tone]}">${esc(humanize(t(text)))}</span>`;
 
 const VISIT_STATUS = {
   booked: ['Booked', 'blue'], checked_in: ['Checked in', 'teal'], in_service: ['With doctor', 'teal'],
