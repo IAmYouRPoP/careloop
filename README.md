@@ -126,14 +126,21 @@ A scheduler checks every 15 seconds for due reminders. Each goes by email, as a 
 
 CareLoop needs a host that keeps a server running (for live updates and the reminder scheduler). Serverless hosts like Vercel or Netlify won't work.
 
-**Render (free, good for a demo link)**
-1. Push this folder to a GitHub repository.
-2. On [render.com](https://render.com): **New + → Blueprint**, pick the repository. [render.yaml](render.yaml) sets the build, start command, `NODE_ENV=production` and a generated `JWT_SECRET`.
-3. After the first deploy, set `PUBLIC_URL` to the site's address (used in QR codes and email links).
+**Render + Neon (free, live mode, data kept)**
 
-As written, the blueprint deploys a **demo** site. The free plan sleeps after 15 minutes idle; the first visit after that takes 30 to 60 seconds and starts with fresh demo data. Open the link once before presenting. Reminders don't fire while it sleeps.
+The server runs on Render; the data lives in a free [Neon](https://neon.tech) PostgreSQL database, so it survives restarts and redeploys.
 
-**For real use**: a paid plan with a disk (data must survive restarts), `DATA_DIR=/var/data`, `DEMO_MODE=off`, and `ADMIN_EMAIL` / `ADMIN_PASSWORD`. The steps are in the comments at the top of `render.yaml`.
+1. **Neon**: sign up, create a project (pick a region near your users, e.g. Asia Pacific (Singapore)), then **Connect** and copy the connection string. It looks like `postgresql://…neon.tech/neondb?sslmode=require`.
+2. **Render**: sign up with GitHub, then **New + → Blueprint** and pick this repository. [render.yaml](render.yaml) sets live mode, India time (`TZ=Asia/Kolkata`) and a generated `JWT_SECRET`, and asks for:
+   - `DATABASE_URL`: the Neon connection string
+   - `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters): your admin login, created on the first start
+   - `PUBLIC_URL`: leave empty for now
+3. Deploy. When it's live, set `PUBLIC_URL` to the address Render gives you (e.g. `https://careloop.onrender.com`) and save; Render redeploys.
+4. Open the site, **Log in** with your admin email and password, add staff, edit the starter instructions, and generate slots.
+
+Render's free plan sleeps after 15 minutes idle: the first visit after that takes 30 to 60 seconds, and reminders wait until it wakes. Your data is unaffected. A paid instance stays awake.
+
+**Without Neon**: leave `DATABASE_URL` empty and the built-in database is used; on Render that needs a paid plan with a disk and `DATA_DIR=/var/data`, or data is lost on every restart.
 
 Optional settings on the host: `ANTHROPIC_API_KEY` (AI extraction), SMTP (email), Twilio (SMS).
 

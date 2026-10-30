@@ -4,6 +4,12 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { BASE_DIR as dir } from './paths.js';
 
+// Never wipe a hosted database from here: that has to be a deliberate step in its own dashboard.
+if (process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is set, so data lives on a PostgreSQL server. Reset it from that server (e.g. the Neon dashboard), not with this script.');
+  process.exit(1);
+}
+
 try {
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
 } catch (e) {

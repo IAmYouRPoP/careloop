@@ -1,13 +1,13 @@
-# Render blueprint: New + > Blueprint, pick this repo.
+# Render blueprint for the LIVE site with a free Neon PostgreSQL database.
+# Render: New + > Blueprint > pick this repository. Render asks for the values marked sync: false:
+#   DATABASE_URL    Neon connection string (Neon dashboard > Connect), ends with ?sslmode=require
+#   ADMIN_EMAIL     your admin login email (used once, on the first start)
+#   ADMIN_PASSWORD  12+ characters (used once, on the first start)
+#   PUBLIC_URL      the site's address, e.g. https://careloop.onrender.com (fill in after the first deploy)
 #
-# As written this deploys a DEMO site: sample patients and staff, one-click demo sign-ins.
-# The free plan sleeps when idle and starts with fresh data each time (no persistent disk),
-# which suits a demo link.
-#
-# For REAL use:
-#   1. Switch to a paid plan and uncomment the disk block below (data must survive restarts).
-#   2. Set DEMO_MODE to "off" and fill in ADMIN_EMAIL and ADMIN_PASSWORD (12+ characters).
-#   3. Add DATA_DIR = /var/data.
+# Data lives in Neon, so it survives restarts and redeploys even on Render's free plan.
+# The free plan still sleeps after 15 minutes idle: the next visit takes 30-60 s, and reminders
+# wait until it wakes. A paid instance stays awake.
 services:
   - type: web
     name: careloop
@@ -19,19 +19,19 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: JWT_SECRET
-        generateValue: true
       - key: NODE_VERSION
         value: "22"
-      - key: PUBLIC_URL
-        sync: false
+      - key: TZ
+        value: Asia/Kolkata
       - key: DEMO_MODE
-        value: "on"
+        value: "off"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-    # disk:
-    #   name: careloop-data
-    #   mountPath: /var/data
-    #   sizeGB: 1
+      - key: PUBLIC_URL
+        sync: false
