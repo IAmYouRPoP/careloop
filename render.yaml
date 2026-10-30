@@ -1,6 +1,13 @@
-# Render blueprint: New + > Blueprint, pick this repo. Free plan: the service sleeps when idle and
-# starts with fresh demo data each time (no persistent disk). For data that survives restarts,
-# switch to a paid plan, uncomment the disk block, and set DATA_DIR to its mount path.
+# Render blueprint: New + > Blueprint, pick this repo.
+#
+# As written this deploys a DEMO site: sample patients and staff, one-click demo sign-ins.
+# The free plan sleeps when idle and starts with fresh data each time (no persistent disk),
+# which suits a demo link.
+#
+# For REAL use:
+#   1. Switch to a paid plan and uncomment the disk block below (data must survive restarts).
+#   2. Set DEMO_MODE to "off" and fill in ADMIN_EMAIL and ADMIN_PASSWORD (12+ characters).
+#   3. Add DATA_DIR = /var/data.
 services:
   - type: web
     name: careloop
@@ -18,8 +25,13 @@ services:
         value: "22"
       - key: PUBLIC_URL
         sync: false
+      - key: DEMO_MODE
+        value: "on"
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
     # disk:
     #   name: careloop-data
     #   mountPath: /var/data
     #   sizeGB: 1
-    # (then add: - key: DATA_DIR / value: /var/data)

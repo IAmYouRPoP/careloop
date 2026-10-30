@@ -14,10 +14,25 @@ npm install
 npm start
 ```
 
-Open http://localhost:3000. The first start creates `data/` and seeds synthetic data (takes a few seconds).
+Open http://localhost:3000. The first start creates the database and seeds it (takes a few seconds). The server prints where the database lives.
 
 - `npm run dev`: restart automatically on server changes
 - `npm run reset`: delete the database (stop the server first); the next start re-seeds it
+- Stop the server with Ctrl+C: it closes the database cleanly first.
+
+**Where the data is stored**: the project's `data/` folder, or `%LOCALAPPDATA%\CareLoop\data` when the project sits in a OneDrive folder (OneDrive locks database files while it syncs, which stops the database from starting). Set `DATA_DIR` to choose another place.
+
+## Demo mode and live mode
+
+| | Demo mode (default) | Live mode (`DEMO_MODE=off`) |
+| --- | --- | --- |
+| Sample patients, staff, visits, history | Yes | No |
+| One-click demo sign-ins (public password) | Yes | No |
+| "Demo site" banner | Yes | No |
+| Departments, starter tests and instructions, symptom rules, 7 days of slots | Yes | Yes |
+| First admin account | `admin@careloop.test` | From `ADMIN_EMAIL` / `ADMIN_PASSWORD` (12+ characters) |
+
+Live mode refuses to start on a database that contains the demo accounts; run `npm run reset` first. After the first start, the admin adds staff, edits the starter instructions to the hospital's own, and generates more slots.
 
 Every setting is optional for local use; see [.env.example](.env.example) for the full list.
 
@@ -116,9 +131,11 @@ CareLoop needs a host that keeps a server running (for live updates and the remi
 2. On [render.com](https://render.com): **New + → Blueprint**, pick the repository. [render.yaml](render.yaml) sets the build, start command, `NODE_ENV=production` and a generated `JWT_SECRET`.
 3. After the first deploy, set `PUBLIC_URL` to the site's address (used in QR codes and email links).
 
-The free plan sleeps after 15 minutes idle; the first visit after that takes 30 to 60 seconds and starts with fresh demo data. Open the link once before presenting. Reminders don't fire while it sleeps. For data that survives restarts, use a paid plan with a disk and set `DATA_DIR` (see the comments in `render.yaml`).
+As written, the blueprint deploys a **demo** site. The free plan sleeps after 15 minutes idle; the first visit after that takes 30 to 60 seconds and starts with fresh demo data. Open the link once before presenting. Reminders don't fire while it sleeps.
 
-Optional settings on the host: `ANTHROPIC_API_KEY` (AI extraction), SMTP (email), Twilio (SMS), `DEMO_MODE=off` (hide demo sign-ins).
+**For real use**: a paid plan with a disk (data must survive restarts), `DATA_DIR=/var/data`, `DEMO_MODE=off`, and `ADMIN_EMAIL` / `ADMIN_PASSWORD`. The steps are in the comments at the top of `render.yaml`.
+
+Optional settings on the host: `ANTHROPIC_API_KEY` (AI extraction), SMTP (email), Twilio (SMS).
 
 **Before any real use**: this demo has no encryption at rest, audit log, backups, rate limiting or refresh tokens, and its clinical content is unreviewed. Don't enter real patient data.
 
@@ -128,6 +145,8 @@ Optional settings on the host: `ANTHROPIC_API_KEY` (AI extraction), SMTP (email)
 server/
   index.js      Express API (/api/v1), Socket.IO rooms, auth, queue, QR check-in
   logic.js      wait estimate, readiness check, symptom matching
+  validate.js   shared input checks (dates, lengths, ranges)
+  paths.js      where the database folder lives
   llm.js        optional Claude symptom extraction
   conditions.js condition lookup data (sources checked 2026-10-29)
   care.js       Phase 2 routes: caregivers, discharge/follow-up, medications, reminders

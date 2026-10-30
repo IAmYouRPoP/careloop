@@ -29,11 +29,29 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
   console.error('JWT_SECRET must be set to a random string of at least 32 characters when NODE_ENV=production.');
   process.exit(1);
 }
-// Demo mode shows one-click demo sign-ins on the login page. On unless DEMO_MODE=off.
+// Demo mode: sample patients and staff with one-click sign-ins and a public password. On unless DEMO_MODE=off.
+// Live mode (DEMO_MODE=off): no sample people; the first start creates one admin from ADMIN_EMAIL / ADMIN_PASSWORD.
 const DEMO_MODE = process.env.DEMO_MODE !== 'off';
 
 await initSchema();
-await seedIfEmpty();
+if (DEMO_MODE) {
+  await seedIfEmpty({ demo: true });
+} else {
+  // Never run live with the demo accounts present: their password is published in the code.
+  if (await one(`SELECT 1 FROM users WHERE email = 'admin@careloop.test'`)) {
+    console.error('This database contains the demo accounts. Delete the data folder (npm run reset) before starting in live mode.');
+    process.exit(1);
+  }
+  if (!(await one('SELECT 1 FROM departments LIMIT 1'))) {
+    const email = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const password = process.env.ADMIN_PASSWORD || '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || password.length < 12) {
+      console.error('Live mode needs ADMIN_EMAIL and ADMIN_PASSWORD (12+ characters) to create the first admin account.');
+      process.exit(1);
+    }
+    await seedIfEmpty({ demo: false, admin: { email, password, name: process.env.ADMIN_NAME || 'Administrator' } });
+  }
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -821,7 +839,7 @@ app.post('/api/v1/symptoms/assess', async (req, res) => {
 app.get('/api/v1/symptoms/ai-status', (req, res) => res.json(aiStatus()));
 
 // Which optional integrations this server has configured.
-app.get('/api/v1/features', (req, res) => res.json({ ai: aiStatus().enabled, sms: smsStatus().enabled }));
+app.get('/api/v1/features', (req, res) => res.json({ ai: aiStatus().enabled, sms: smsStatus().enabled, demo: DEMO_MODE }));
 
 app.get('/api/v1/conditions', async (req, res) => {
   const depts = await q('SELECT id, name FROM departments WHERE is_active');
@@ -910,6 +928,20 @@ app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'Something went wrong on our side.' });
 });
+
+// Close the database cleanly on Ctrl-C or a host's stop signal, so nothing is lost mid-write.
+let stopping = false;
+async function shutdown(signal) {
+  if (stopping) return;
+  stopping = true;
+  console.log(`${signal} received, closing the database...`);
+  server.close();
+  io.close();
+  try { await db.close(); } catch (e) { console.error('Database close failed:', e.message); }
+  process.exit(0);
+}
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 server.listen(PORT, () => {
   console.log(`CareLoop running at http://localhost:${PORT}`);

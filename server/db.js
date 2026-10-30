@@ -3,12 +3,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { BASE_DIR } from './paths.js';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
-// DATA_DIR lets a host point the database at persistent storage (e.g. a mounted disk).
-const BASE_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(here, '..', 'data');
 export const DATA_DIR = path.join(BASE_DIR, 'pgdata');
+console.log(`Database folder: ${DATA_DIR}`);
 
 fs.mkdirSync(path.dirname(DATA_DIR), { recursive: true });
+// A real PostgreSQL data folder always has PG_VERSION. If the folder exists without it (an
+// interrupted first start, or files removed by a sync tool), start it fresh instead of crashing.
+if (fs.existsSync(DATA_DIR) && !fs.existsSync(path.join(DATA_DIR, 'PG_VERSION'))) {
+  console.warn(`Database folder ${DATA_DIR} is incomplete; creating a fresh database.`);
+  fs.rmSync(DATA_DIR, { recursive: true, force: true });
+}
 export const db = new PGlite(DATA_DIR);
 
 export async function q(sql, params = [], conn = db) {

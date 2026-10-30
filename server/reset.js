@@ -1,13 +1,8 @@
-// Deletes the local database; the next `npm start` re-seeds fresh synthetic data.
+// Deletes the local database; the next `npm start` re-seeds fresh data.
 // Stop the server first: an open database (or a cloud-sync client holding files) blocks deletion.
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const dir = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
+import { BASE_DIR as dir } from './paths.js';
 
 try {
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
@@ -19,7 +14,7 @@ if (fs.existsSync(dir) && process.platform === 'win32') {
   spawnSync('cmd.exe', ['/d', '/c', 'rmdir', '/s', '/q', dir], { stdio: 'ignore' });
 }
 if (fs.existsSync(dir)) {
-  console.error('The database folder is still there. Stop the server (and pause OneDrive sync if needed), then try again.');
+  console.error(`The database folder ${dir} is still there. Stop the server, then try again.`);
   process.exit(1);
 }
-console.log('Database removed. Run `npm start` to re-seed.');
+console.log(`Database removed (${dir}). Run \`npm start\` to re-seed.`);

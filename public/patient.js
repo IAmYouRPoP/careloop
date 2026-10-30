@@ -13,42 +13,141 @@ export const homeFor =(u) => (!u ? '#/' : u.role === 'patient' ? '#/home' : u.ro
 
 // ---------- landing ----------
 
+// Simple line icons (24×24, drawn with the current text colour).
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  clipboard: '<rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4.5V3.5h6v1"/><path d="m9 13 2 2 4-4"/>',
+  ticket: '<path d="M4 8a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2z"/><path d="M12 6v12" stroke-dasharray="2 2"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  bell: '<path d="M6 10a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  users: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2A4.5 4.5 0 0 1 21 18.5"/>',
+  clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 1.8"/>',
+  chart: '<path d="M4 20V4"/><path d="M4 20h16"/><path d="m7 15 4-4 3 3 5-6"/>',
+  monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  pill: '<rect x="3.5" y="9" width="17" height="6" rx="3" transform="rotate(-35 12 12)"/><path d="m9.5 8.5 5 7"/>',
+  shield: '<path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>',
+  alert: '<path d="M12 4 3 19h18z"/><path d="M12 10v4M12 17h.01"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/>',
+};
+const icon = (name, cls = 'h-5 w-5') =>
+  `<svg viewBox="0 0 24 24" class="${cls}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
 export async function landing(el) {
-  const stage = (n, title, body, href, cta) => `
-    <a href="${href}" class="card p-5 hover:shadow-md hover:border-brand-500 transition block">
-      <div class="text-xs font-bold text-brand-700 uppercase tracking-wide">${t(n)}</div>
-      <h3 class="font-semibold mt-1">${t(title)}</h3>
-      <p class="text-sm text-slate-500 mt-1">${t(body)}</p>
-      <div class="text-sm font-semibold text-brand-700 mt-3">${t(cta)} →</div>
-    </a>`;
+  const signedIn = !!S.user;
+  const patient = S.user?.role === 'patient';
+  const bookHref = patient ? '#/book' : signedIn ? homeFor(S.user) : '#/signup';
+
+  // The patient journey: four steps, each linking to the part of the app that does it.
+  const steps = [
+    ['search', 'Find care', 'Describe how you feel. Get the right department and how soon to go.', '#/symptoms'],
+    ['clipboard', 'Prepare', 'A checklist from the hospital’s own instructions, so nothing is forgotten.', patient ? '#/visits' : '#/login'],
+    ['ticket', 'Check in', 'Scan the QR code at reception and follow your place in the queue live.', patient ? '#/visits' : '#/login'],
+    ['heart', 'Recover', 'Medicine times, follow-up dates and reminders from your care team.', patient ? '#/home' : '#/login'],
+  ];
+  const journey = `
+    <div class="card p-6 sm:p-7 lg:ml-6 shadow-xl ring-1 ring-slate-900/5">
+      <div class="text-xs font-semibold uppercase tracking-wider text-brand-700">${t('Your visit, step by step')}</div>
+      <ol class="mt-5 relative">
+        ${steps.map(([ic, title, body, href], i) => `
+          <li class="relative pl-14 ${i < steps.length - 1 ? 'pb-6' : ''}">
+            ${i < steps.length - 1 ? '<span class="absolute left-[1.15rem] top-10 bottom-0 w-px bg-gradient-to-b from-brand-500/40 to-slate-200" aria-hidden="true"></span>' : ''}
+            <span class="absolute left-0 top-0 h-9 w-9 rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-100 grid place-items-center">${icon(ic)}</span>
+            <a href="${href}" class="group block">
+              <div class="flex items-center gap-2"><span class="text-xs font-semibold text-slate-400">0${i + 1}</span>
+                <span class="font-semibold text-slate-900 group-hover:text-brand-700">${t(title)}</span></div>
+              <p class="text-sm text-slate-500 mt-0.5">${t(body)}</p>
+            </a>
+          </li>`).join('')}
+      </ol>
+    </div>`;
+
+  const feature = (ic, title, body) => `
+    <div class="card p-6">
+      <span class="h-10 w-10 rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-100 grid place-items-center">${icon(ic)}</span>
+      <h3 class="font-semibold mt-4">${t(title)}</h3>
+      <p class="text-sm text-slate-500 mt-1.5 leading-relaxed">${t(body)}</p>
+    </div>`;
+  const point = (ic, title, body, dark = false) => `
+    <div class="flex gap-4">
+      <span class="shrink-0 h-10 w-10 rounded-xl grid place-items-center ${dark ? 'bg-white/10 text-teal-200 ring-1 ring-white/15' : 'bg-brand-50 text-brand-700 ring-1 ring-brand-100'}">${icon(ic)}</span>
+      <div><h3 class="font-semibold ${dark ? 'text-white' : ''}">${t(title)}</h3>
+        <p class="text-sm mt-1 leading-relaxed ${dark ? 'text-slate-300' : 'text-slate-500'}">${t(body)}</p></div>
+    </div>`;
+
   el.innerHTML = `
-    <section class="hero-glow -mx-4 -mt-8 px-4 pt-14 pb-16 sm:pt-20 sm:pb-20 grid lg:grid-cols-2 gap-12 items-center rounded-b-[2rem]">
+    <section class="hero-glow -mx-4 -mt-8 px-4 pt-14 pb-16 sm:pt-20 sm:pb-24 grid lg:grid-cols-2 gap-12 items-center">
       <div>
-        ${badge('Synthetic demo', 'amber')}
+        <span class="eyebrow inline-flex items-center gap-2 rounded-full ring-1 ring-slate-200 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+          <span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>${t('Hospital visits, without the guesswork')}</span>
         <h1 class="text-4xl sm:text-[3.25rem] font-semibold tracking-tight mt-5 leading-[1.08] text-slate-900">${t('From “what’s wrong?” to “what do I do next?”')}</h1>
         <p class="text-lg text-slate-600 mt-5 max-w-xl leading-relaxed">${t('CareLoop guides you before, during and after a hospital visit: the right department, a checklist so you arrive ready, and a live queue so you know your turn.')}</p>
         <div class="flex flex-wrap gap-3 mt-8">
-          <a href="#/symptoms" class="btn btn-primary">${t('Find the right department')}</a>
-          ${S.user ? `<a href="${homeFor(S.user)}" class="btn btn-ghost">${t('Go to my dashboard')}</a>` : `<a href="#/signup" class="btn btn-ghost">${t('Create an account')}</a>`}
+          <a href="#/symptoms" class="btn btn-primary">${icon('search', 'h-4 w-4')} ${t('Check your symptoms')}</a>
+          <a href="${bookHref}" class="btn btn-ghost">${t(patient ? 'Book a visit' : signedIn ? 'Go to my dashboard' : 'Create a free account')}</a>
         </div>
+        <p class="mt-6 text-sm text-slate-500 flex items-center gap-2">
+          <span class="h-2 w-2 rounded-full bg-red-500"></span>${t('Emergency?')} <a href="tel:112" class="font-semibold text-red-700">112</a> · <a href="tel:108" class="font-semibold text-red-700">108</a>
+        </p>
       </div>
-      <div class="card p-6 lg:ml-6 shadow-xl ring-1 ring-slate-900/5 rotate-[0.6deg]" aria-hidden="true">
-        <div class="flex items-center justify-between">
-          <div><div class="text-xs text-slate-500">${t('Your token')}</div><div class="text-3xl font-bold">GEN-006</div></div>
-          ${badge('Waiting', 'blue')}
-        </div>
-        <div class="grid grid-cols-2 gap-3 mt-5">
-          <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">${t('Position')}</div><div class="text-2xl font-bold">${ordinal(3)}</div></div>
-          <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">${t('Estimated wait')}</div><div class="text-2xl font-bold">~24 min</div><div class="text-xs text-slate-500">18–30 min</div></div>
-        </div>
-        <div class="mt-4 rounded-xl bg-emerald-50 text-emerald-800 text-sm p-3">✓ ${t('You’re ready.')} ${t('All documents and fasting steps are confirmed.')}</div>
+      ${journey}
+    </section>
+
+    <section class="py-16">
+      <div class="max-w-2xl">
+        <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight">${t('Everything for your visit, in one place')}</h2>
+        <p class="text-slate-500 mt-3">${t('No more guessing which counter to go to, what to bring, or how long you’ll wait.')}</p>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-10">
+        ${feature('search', 'Symptom guide', 'Plain-language guidance to the right department, with emergency signs checked first.')}
+        ${feature('clipboard', 'Readiness check', 'Know what to bring and when to start fasting. Every item shows the hospital instruction it came from.')}
+        ${feature('clock', 'Honest wait times', 'Estimates based on how long visits really take, labelled clearly when there isn’t much data yet.')}
+        ${feature('bell', 'Reminders that help', 'Appointment, preparation and medicine reminders by email or text, only when they’re needed.')}
+        ${feature('users', 'Family caregivers', 'Share your visits and recovery plan with someone you trust, and remove access any time.')}
+        ${feature('globe', 'हिन्दी and English', 'Switch language in one tap. Hospital instructions always show exactly as written.')}
       </div>
     </section>
-    <section class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-10 pb-6">
-      ${stage('Find care', 'Symptom guide', 'Describe how you feel; get a department and how soon to go. Emergencies are flagged first.', '#/symptoms', 'Try it')}
-      ${stage('Before', 'Readiness check', 'A checklist from the hospital’s own instructions, with flags for missing documents and fasting.', S.user ? '#/book' : '#/login', 'Book a visit')}
-      ${stage('During', 'Live queue', 'Check in from your phone, see your position and an honest wait estimate.', S.user ? '#/visits' : '#/login', 'See my visits')}
-      ${stage('After', 'Recovery checklist', 'Follow-up dates, medicine times and reminders from your care team, shared with family if you choose.', S.user ? '#/home' : '#/login', 'See my recovery')}
+
+    <section class="-mx-4 px-4 sm:mx-0 sm:px-0">
+      <div class="rounded-none sm:rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-teal-950 px-6 sm:px-12 py-14 grid lg:grid-cols-5 gap-10 items-center">
+        <div class="lg:col-span-2">
+          <div class="text-xs font-semibold uppercase tracking-wider text-teal-300">${t('For hospital teams')}</div>
+          <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white mt-3">${t('Run a calmer front desk')}</h2>
+          <p class="text-slate-300 mt-3">${t('Fewer “how long will it be?” questions, fewer unprepared arrivals, and empty slots that fill themselves.')}</p>
+          <a href="#/login" class="btn mt-6 bg-white text-slate-900 hover:bg-slate-100">${t('Staff log in')}</a>
+        </div>
+        <div class="lg:col-span-3 grid sm:grid-cols-2 gap-8">
+          ${point('monitor', 'Live queue console', 'Call, start and finish visits; the waiting-room screen and patients’ phones update instantly.', true)}
+          ${point('pill', 'Discharge in minutes', 'Follow-up dates, tasks and medicine schedules, with reminders sent automatically.', true)}
+          ${point('link', 'Slot rescue', 'Cancelled places are offered to patients waiting for an earlier time. First to accept moves up.', true)}
+          ${point('chart', 'Clear analytics', 'Waiting times, no-shows and unprepared arrivals by department, exportable to CSV or PDF.', true)}
+        </div>
+      </div>
+    </section>
+
+    <section class="py-16 grid lg:grid-cols-5 gap-10">
+      <div class="lg:col-span-2">
+        <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight">${t('Safe by design')}</h2>
+        <p class="text-slate-500 mt-3">${t('CareLoop helps you find care and prepare. Medical decisions stay with your doctors.')}</p>
+      </div>
+      <div class="lg:col-span-3 grid sm:grid-cols-2 gap-8">
+        ${point('alert', 'Emergencies first', 'Warning signs like chest pain or stroke symptoms go straight to 112 / 108, before anything else.')}
+        ${point('shield', 'Never diagnoses', 'It suggests a department and how soon to go. No diagnoses, no medicine advice.')}
+        ${point('clipboard', 'Hospital-verified', 'Preparation steps and medicines come from your care team, shown word for word.')}
+        ${point('lock', 'Your data, your choice', 'Visits are shared with family only when you invite them, and you can stop at any time.')}
+      </div>
+    </section>
+
+    <section class="card cta-band px-6 sm:px-10 py-10 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+      <div>
+        <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">${t('Not sure where to go?')}</h2>
+        <p class="text-slate-600 mt-1">${t('Start with the symptom guide. It takes about a minute.')}</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a href="#/symptoms" class="btn btn-primary">${t('Check your symptoms')}</a>
+        <a href="#/conditions" class="btn btn-ghost">${t('Look up a condition')}</a>
+      </div>
     </section>`;
 }
 
@@ -97,6 +196,7 @@ export async function login(el) {
 }
 
 export async function signup(el) {
+  const { demo } = await api('/features').catch(() => ({ demo: true }));
   el.innerHTML = `
     <div class="max-w-md mx-auto py-10">
       <div class="card p-6 sm:p-8">
@@ -114,7 +214,9 @@ export async function signup(el) {
         </form>
         <p class="text-sm text-slate-500 mt-4">Already registered? <a href="#/login" class="text-brand-700 font-semibold">Log in</a></p>
       </div>
-      <p class="text-xs text-slate-400 text-center mt-4">${SYNTHETIC_NOTE} Please don’t enter real health information.</p>
+      <p class="text-xs text-slate-400 text-center mt-4">${demo
+        ? `${t(SYNTHETIC_NOTE)} Please don’t enter real health information.`
+        : 'We only ask for what’s needed to book and manage your visits. Your details are shared with family only if you invite them.'}</p>
     </div>`;
   el.querySelector('#f').addEventListener('submit', (e) => {
     e.preventDefault();

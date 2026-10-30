@@ -33,7 +33,7 @@ const DEPARTMENTS = [
   ['Dentistry', 'Teeth and gums.', 'Block D, Ground floor', 15],
 ];
 
-const SRC = (code) => `Demo instruction sheet ${code} (synthetic)`;
+const SRC = (code) => `Starter instruction sheet ${code} (replace with your hospital's own)`;
 
 // [dept, name, fastingHours|null, documents, instructions[[item_type, text]]]
 const TESTS = [
@@ -174,11 +174,14 @@ function at(dayOffset, h, m) {
   return d;
 }
 
-export async function seedIfEmpty() {
+// Demo mode seeds sample people and history with a shared public password.
+// Live mode seeds only the hospital setup (departments, starter tests and instructions,
+// symptom rules, slots) and a single admin account from ADMIN_EMAIL / ADMIN_PASSWORD.
+export async function seedIfEmpty({ demo = true, admin: adminAccount = null } = {}) {
   const has = await one('SELECT 1 FROM departments LIMIT 1');
   if (has) return false;
-  console.log('Seeding synthetic demo data...');
-  const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  console.log(demo ? 'Seeding synthetic demo data...' : 'Seeding hospital setup (live mode, no demo accounts)...');
+  const hash = await bcrypt.hash(demo ? DEMO_PASSWORD : adminAccount.password, 10);
 
   await db.transaction(async (tx) => {
     const dept = {};
@@ -190,14 +193,15 @@ export async function seedIfEmpty() {
     }
 
     const user = {};
-    for (const a of DEMO_ACCOUNTS) {
+    const accounts = demo ? DEMO_ACCOUNTS : [{ role: 'admin', email: adminAccount.email, full_name: adminAccount.name }];
+    for (const a of accounts) {
       user[a.email] = (await one(
         `INSERT INTO users (role, full_name, email, password_hash, department_id, phone)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
         [a.role, a.full_name, a.email, hash, a.dept ? dept[a.dept] : null, a.role === 'patient' ? '+91 90000 00001' : null], tx
       )).id;
     }
-    const admin = user['admin@careloop.test'];
+    const admin = user[demo ? 'admin@careloop.test' : adminAccount.email];
 
     const test = {};
     for (const [d, name, fast, docs, instr] of TESTS) {
@@ -231,13 +235,18 @@ export async function seedIfEmpty() {
         const times = [];
         for (let m = 9 * 60; m < 17 * 60; m += 30) if (m < 13 * 60 || m >= 14 * 60) times.push(m);
         for (const m of times) {
+          const when = at(day, Math.floor(m / 60), m % 60);
+          if (!demo && when <= new Date()) continue; // live mode: no slots in the past
           await q(
             `INSERT INTO slots (department_id, starts_at, capacity) VALUES ($1, $2, 4) ON CONFLICT DO NOTHING`,
-            [dept[name], at(day, Math.floor(m / 60), m % 60).toISOString()], tx
+            [dept[name], when.toISOString()], tx
           );
         }
       }
     }
+
+    // Live mode stops here: no sample patients, visits or history.
+    if (!demo) return;
 
     const patients = [user['arjun@careloop.test']];
     for (const [i, name] of SYNTHETIC_PATIENTS.entries()) {

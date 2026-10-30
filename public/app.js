@@ -9,6 +9,9 @@ import {
   staffToday, staffQueue, staffVisit, display, qrPoster, adminDepartments, adminTests, adminSlots, adminStaff, adminRules,
 } from './staff.js';
 
+// Which mode the server runs in (demo shows sample-data notices). Fetched once at start-up.
+const FEATURES = await fetch('/api/v1/features').then((r) => r.json()).catch(() => ({ demo: true }));
+
 const ALL = ['patient', 'staff', 'admin'];
 const STAFF = ['staff', 'admin'];
 
@@ -69,6 +72,7 @@ function shell(path) {
   const best = matches.sort((a, b) => b.length - a.length)[0];
   const active = (href) => href.slice(1) === best;
   return `
+    ${FEATURES.demo ? `<div class="bg-slate-900 text-slate-200 text-xs text-center px-4 py-2">${t('Demo site with sample data.')} ${S.user ? '' : `<a href="#/login" class="font-semibold text-white underline underline-offset-2">${t('Try the demo accounts')}</a>`}</div>` : ''}
     <header class="site-header sticky top-0 z-40 border-b backdrop-blur-md">
       <div class="max-w-6xl mx-auto px-4 py-2 lg:py-0 lg:h-16 flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1">
         <a href="${homeFor(S.user)}" class="flex items-center gap-2.5 font-semibold text-[1.05rem] tracking-tight shrink-0">
@@ -89,7 +93,8 @@ function shell(path) {
     </header>
     <main id="view" class="max-w-6xl mx-auto px-4 py-8"></main>
     <footer class="max-w-6xl mx-auto px-4 pb-10 pt-6 mt-4 border-t border-slate-200/70 text-xs text-slate-400 flex flex-wrap justify-between gap-2">
-      <span>${t(SYNTHETIC_NOTE)}</span><span>${t('In an emergency call 112 or 108.')}</span>
+      <span>${t(FEATURES.demo ? SYNTHETIC_NOTE : 'CareLoop helps you find care and prepare for visits. It doesn’t replace advice from a doctor.')}</span>
+      <span>${t('In an emergency call 112 or 108.')}</span>
     </footer>`;
 }
 
