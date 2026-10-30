@@ -8,7 +8,25 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const USING_SERVER_DB = !!process.env.DATABASE_URL;
 
-async function openPostgres(url) {
+// Accepts the bare connection string, and also the common paste mistake of copying a whole .env
+// snippet from Neon (DATABASE_URL="..." with quotes, sometimes followed by more lines).
+// Never prints the value: it contains the database password.
+export function cleanDatabaseUrl(raw) {
+  let s = String(raw || '').trim().split(/\r?\n/)[0].trim();
+  s = s.replace(/^(export\s+)?DATABASE_URL\s*=\s*/i, '').trim().replace(/^["']|["']$/g, '').trim();
+  let url;
+  try { url = new URL(s); } catch { url = null; }
+  if (!url || !/^postgres(ql)?:$/.test(url.protocol) || !url.hostname) {
+    console.error('DATABASE_URL is not a valid connection string. Paste only the part that starts with postgresql:// (no DATABASE_URL= and no quotes).');
+    process.exit(1);
+  }
+  // node-postgres doesn't need libpq's channel_binding flag; drop it so it can't confuse older drivers.
+  url.searchParams.delete('channel_binding');
+  return url.toString();
+}
+
+async function openPostgres(rawUrl) {
+  const url = cleanDatabaseUrl(rawUrl);
   const { default: pg } = await import('pg');
   // Return DATE columns as 'YYYY-MM-DD' text, so no time zone shifts a birthday or follow-up date.
   pg.types.setTypeParser(1082, (v) => v);
