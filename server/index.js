@@ -14,6 +14,7 @@ import {
 } from './logic.js';
 import { aiStatus, extractSymptoms } from './llm.js';
 import { searchConditions } from './conditions.js';
+import { makeValidators } from './validate.js';
 import { seedIfEmpty, DEMO_ACCOUNTS, DEMO_PASSWORD } from './seed.js';
 import { registerCareRoutes } from './care.js';
 import { scheduleVisitReminders, startScheduler, sendSms, smsStatus, toE164 } from './reminders.js';
@@ -58,15 +59,20 @@ function readUser(req) {
   try { return jwt.verify(h.slice(7), SECRET); } catch { return null; }
 }
 
+// Also re-checks the account on every request, so a disabled staff member is locked out
+// at once instead of when their 8-hour token expires.
 function auth(...roles) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     req.user = readUser(req);
     if (!req.user) return res.status(401).json({ error: 'Please sign in.' });
+    const row = await one('SELECT is_active, role FROM users WHERE id = $1', [req.user.id]);
+    if (!row || !row.is_active || row.role !== req.user.role) return res.status(401).json({ error: 'Please sign in again.' });
     if (roles.length && !roles.includes(req.user.role)) return res.status(403).json({ error: 'Not allowed for your role.' });
     next();
   };
 }
 const isStaff = (u) => u.role === 'staff' || u.role === 'admin';
+const V = makeValidators(fail);
 
 function publicUser(u) {
   const { password_hash, ...rest } = u;
@@ -175,23 +181,26 @@ app.get('/api/v1/demo-accounts', (req, res) => {
 });
 
 app.post('/api/v1/auth/signup', async (req, res) => {
-  const { full_name, email, password, phone, date_of_birth } = req.body || {};
-  if (!full_name || !email || !password) fail(400, 'Name, email and password are required.');
-  if (String(password).length < 8) fail(400, 'Password must be at least 8 characters.');
+  const body = req.body || {};
+  const fullName = V.text(body.full_name, 'Full name', { max: 100 });
+  const email = V.email(body.email);
+  const password = V.password(body.password);
+  const dob = V.dateOfBirth(body.date_of_birth);
+  const phone = body.phone ? String(body.phone).trim() : null;
   if (phone && !toE164(phone)) fail(400, 'Enter the phone number with country code, for example +91 98765 43210.');
-  const exists = await one('SELECT 1 FROM users WHERE lower(email) = lower($1)', [email]);
+  const exists = await one('SELECT 1 FROM users WHERE lower(email) = $1', [email]);
   if (exists) fail(409, 'An account with that email already exists.');
   const u = await one(
     `INSERT INTO users (role, full_name, email, phone, date_of_birth, password_hash)
-     VALUES ('patient', $1, lower($2), $3, $4, $5) RETURNING *`,
-    [full_name, email, phone || null, date_of_birth || null, await bcrypt.hash(password, 10)]
+     VALUES ('patient', $1, $2, $3, $4, $5) RETURNING *`,
+    [fullName, email, phone, dob, await bcrypt.hash(password, 10)]
   );
   res.status(201).json({ token: signToken(u), user: publicUser(u) });
 });
 
 app.post('/api/v1/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
-  const u = await one('SELECT * FROM users WHERE lower(email) = lower($1)', [email || '']);
+  const u = await one('SELECT * FROM users WHERE lower(email) = lower($1)', [String(email || '').trim()]);
   if (!u || !u.is_active || !(await bcrypt.compare(password || '', u.password_hash))) {
     fail(401, 'Email or password is incorrect.');
   }
@@ -200,7 +209,8 @@ app.post('/api/v1/auth/login', async (req, res) => {
 
 app.get('/api/v1/me', auth(), async (req, res) => {
   const u = await one(
-    `SELECT u.*, d.name AS department_name FROM users u LEFT JOIN departments d ON d.id = u.department_id WHERE u.id = $1`,
+    `SELECT u.*, d.name AS department_name, to_char(u.date_of_birth, 'YYYY-MM-DD') AS dob_ymd
+       FROM users u LEFT JOIN departments d ON d.id = u.department_id WHERE u.id = $1`,
     [req.user.id]
   );
   if (!u) fail(401, 'Account not found.');
@@ -208,21 +218,30 @@ app.get('/api/v1/me', auth(), async (req, res) => {
 });
 
 app.patch('/api/v1/me', auth(), async (req, res) => {
-  const { full_name, phone, date_of_birth, slot_rescue_opt_in, sms_opt_in, language } = req.body || {};
-  if (phone && !toE164(phone)) fail(400, 'Enter the phone number with country code, for example +91 98765 43210.');
-  if (language && !['en', 'hi'].includes(language)) fail(400, 'Unsupported language.');
-  const current = await one('SELECT phone FROM users WHERE id = $1', [req.user.id]);
-  if (sms_opt_in === true && !(phone || current?.phone)) fail(400, 'Add a phone number first to get text reminders.');
-  const bool = (x) => (typeof x === 'boolean' ? x : null);
+  const body = req.body || {};
+  const has = (k) => Object.prototype.hasOwnProperty.call(body, k);
+  const current = await one('SELECT * FROM users WHERE id = $1', [req.user.id]);
+  // Only fields that were sent change. Phone and date of birth can be cleared by sending ''.
+  const fullName = has('full_name') ? V.text(body.full_name, 'Full name', { max: 100 }) : current.full_name;
+  const dob = has('date_of_birth') ? V.dateOfBirth(body.date_of_birth) : current.date_of_birth;
+  let phone = current.phone;
+  if (has('phone')) {
+    phone = body.phone ? String(body.phone).trim() : null;
+    if (phone && !toE164(phone)) fail(400, 'Enter the phone number with country code, for example +91 98765 43210.');
+  }
+  const language = has('language') ? V.oneOf(body.language, 'Language', ['en', 'hi']) : current.language;
+  const bool = (k, prev) => (has(k) ? body[k] === true : prev);
+  let smsOptIn = bool('sms_opt_in', current.sms_opt_in);
+  if (smsOptIn && !phone) {
+    if (has('sms_opt_in') && body.sms_opt_in === true) fail(400, 'Add a phone number first to get text reminders.');
+    smsOptIn = false; // phone was removed, so texts stop too
+  }
+  const slotOptIn = current.role === 'patient' && bool('slot_rescue_opt_in', current.slot_rescue_opt_in);
   const u = await one(
-    `UPDATE users SET full_name = COALESCE($2, full_name), phone = COALESCE($3, phone),
-            date_of_birth = COALESCE($4, date_of_birth),
-            slot_rescue_opt_in = CASE WHEN role = 'patient' THEN COALESCE($5, slot_rescue_opt_in) ELSE false END,
-            sms_opt_in = COALESCE($6, sms_opt_in), language = COALESCE($7, language),
-            updated_at = now()
+    `UPDATE users SET full_name = $2, phone = $3, date_of_birth = $4, slot_rescue_opt_in = $5,
+            sms_opt_in = $6, language = $7, updated_at = now()
       WHERE id = $1 RETURNING *`,
-    [req.user.id, full_name || null, phone || null, date_of_birth || null,
-     bool(slot_rescue_opt_in), bool(sms_opt_in), language || null]
+    [req.user.id, fullName, phone, dob, slotOptIn, smsOptIn, language]
   );
   res.json(publicUser(u));
 });
@@ -235,27 +254,54 @@ app.get('/api/v1/departments', async (req, res) => {
 });
 
 app.post('/api/v1/departments', auth('admin'), async (req, res) => {
-  const { name, description = '', location = '', default_service_minutes = 10 } = req.body || {};
-  if (!name) fail(400, 'Name is required.');
+  const b = req.body || {};
+  const name = V.text(b.name, 'Name', { max: 80 });
+  if (await one('SELECT 1 FROM departments WHERE lower(name) = lower($1)', [name])) fail(409, 'A department with that name already exists.');
   res.status(201).json(await one(
     `INSERT INTO departments (name, description, location, default_service_minutes) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [name, description, location, Number(default_service_minutes) || 10]
+    [name, V.text(b.description, 'Description', { max: 300, required: false }) ?? '',
+     V.text(b.location, 'Location', { max: 120, required: false }) ?? '',
+     V.int(b.default_service_minutes, 'Minutes per patient', { min: 1, max: 240, fallback: 10 })]
   ));
 });
 
 app.patch('/api/v1/departments/:id', auth('admin'), async (req, res) => {
-  const { name, description, location, default_service_minutes, is_active } = req.body || {};
+  const b = req.body || {};
+  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const name = has('name') ? V.text(b.name, 'Name', { max: 80 }) : null;
+  if (name && await one('SELECT 1 FROM departments WHERE lower(name) = lower($1) AND id <> $2', [name, req.params.id])) {
+    fail(409, 'A department with that name already exists.');
+  }
   const d = await one(
     `UPDATE departments SET name = COALESCE($2, name), description = COALESCE($3, description),
             location = COALESCE($4, location), default_service_minutes = COALESCE($5, default_service_minutes),
             is_active = COALESCE($6, is_active), updated_at = now()
       WHERE id = $1 RETURNING *`,
-    [req.params.id, name ?? null, description ?? null, location ?? null,
-     default_service_minutes != null ? Number(default_service_minutes) : null, is_active ?? null]
+    [req.params.id, name,
+     has('description') ? (V.text(b.description, 'Description', { max: 300, required: false }) ?? '') : null,
+     has('location') ? (V.text(b.location, 'Location', { max: 120, required: false }) ?? '') : null,
+     has('default_service_minutes') ? V.int(b.default_service_minutes, 'Minutes per patient', { min: 1, max: 240 }) : null,
+     typeof b.is_active === 'boolean' ? b.is_active : null]
   );
   if (!d) fail(404, 'Department not found.');
   res.json(d);
 });
+
+// Test fields shared by create and edit.
+function readTest(b, partial = false) {
+  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const out = {};
+  if (!partial || has('name')) out.name = V.text(b.name, 'Test name', { max: 100 });
+  if (!partial || has('requires_fasting')) out.requires_fasting = b.requires_fasting === true;
+  if (out.requires_fasting) out.fasting_hours = V.int(b.fasting_hours, 'Fasting hours', { min: 1, max: 24 });
+  else if (out.requires_fasting === false) out.fasting_hours = null;
+  if (!partial || has('required_documents')) {
+    const docs = Array.isArray(b.required_documents) ? b.required_documents : [];
+    out.required_documents = [...new Set(docs.map((s) => String(s).trim()).filter(Boolean))].slice(0, 10);
+    if (out.required_documents.some((s) => s.length > 80)) fail(400, 'Each document name must be 80 characters or fewer.');
+  }
+  return out;
+}
 
 app.get('/api/v1/departments/:id/tests', async (req, res) => {
   res.json(await q('SELECT * FROM tests WHERE department_id = $1 AND is_active ORDER BY name', [req.params.id]));
@@ -268,24 +314,27 @@ app.get('/api/v1/tests', auth('admin', 'staff'), async (req, res) => {
 });
 
 app.post('/api/v1/tests', auth('admin'), async (req, res) => {
-  const { department_id, name, requires_fasting = false, fasting_hours = null, required_documents = [] } = req.body || {};
-  if (!department_id || !name) fail(400, 'Department and name are required.');
+  const b = req.body || {};
+  if (!b.department_id) fail(400, 'Choose a department.');
+  if (!(await one('SELECT 1 FROM departments WHERE id = $1', [b.department_id]))) fail(400, 'That department doesn’t exist.');
+  const t = readTest(b);
   res.status(201).json(await one(
     `INSERT INTO tests (department_id, name, requires_fasting, fasting_hours, required_documents)
      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [department_id, name, !!requires_fasting, requires_fasting ? Number(fasting_hours) || null : null, required_documents]
+    [b.department_id, t.name, t.requires_fasting, t.fasting_hours, t.required_documents]
   ));
 });
 
 app.patch('/api/v1/tests/:id', auth('admin'), async (req, res) => {
-  const { name, requires_fasting, fasting_hours, required_documents, is_active } = req.body || {};
+  const b = req.body || {};
+  const v = readTest(b, true);
   const t = await one(
     `UPDATE tests SET name = COALESCE($2, name), requires_fasting = COALESCE($3, requires_fasting),
-            fasting_hours = CASE WHEN $3::boolean IS FALSE THEN NULL ELSE COALESCE($4, fasting_hours) END,
+            fasting_hours = CASE WHEN $3::boolean IS NULL THEN fasting_hours ELSE $4 END,
             required_documents = COALESCE($5, required_documents), is_active = COALESCE($6, is_active), updated_at = now()
       WHERE id = $1 RETURNING *`,
-    [req.params.id, name ?? null, requires_fasting ?? null,
-     fasting_hours != null ? Number(fasting_hours) : null, required_documents ?? null, is_active ?? null]
+    [req.params.id, v.name ?? null, v.requires_fasting ?? null, v.fasting_hours ?? null,
+     v.required_documents ?? null, typeof b.is_active === 'boolean' ? b.is_active : null]
   );
   if (!t) fail(404, 'Test not found.');
   res.json(t);
@@ -300,12 +349,14 @@ app.get('/api/v1/tests/:id/instructions', auth(), async (req, res) => {
 });
 
 app.post('/api/v1/tests/:id/instructions', auth('admin', 'staff'), async (req, res) => {
-  const { phase = 'before', item_type = 'info', text, source_ref } = req.body || {};
-  if (!text || !source_ref) fail(400, 'Instruction text and its source are required.');
+  const b = req.body || {};
+  if (!(await one('SELECT 1 FROM tests WHERE id = $1', [req.params.id]))) fail(404, 'Test not found.');
   res.status(201).json(await one(
     `INSERT INTO test_instructions (test_id, phase, item_type, text, source_ref, verified_by)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [req.params.id, phase, item_type, text, source_ref, req.user.id]
+    [req.params.id, V.oneOf(b.phase ?? 'before', 'Phase', ['before', 'during', 'after']),
+     V.oneOf(b.item_type ?? 'info', 'Type', ['document', 'fasting', 'task', 'info']),
+     V.text(b.text, 'Instruction text', { max: 500 }), V.text(b.source_ref, 'Source', { max: 200 }), req.user.id]
   ));
 });
 
@@ -313,7 +364,11 @@ app.post('/api/v1/tests/:id/instructions', auth('admin', 'staff'), async (req, r
 app.put('/api/v1/instructions/:id', auth('admin', 'staff'), async (req, res) => {
   const old = await one('SELECT * FROM test_instructions WHERE id = $1 AND is_current', [req.params.id]);
   if (!old) fail(404, 'Instruction not found.');
-  const { text = old.text, source_ref = old.source_ref, item_type = old.item_type, phase = old.phase } = req.body || {};
+  const b = req.body || {};
+  const text = V.text(b.text ?? old.text, 'Instruction text', { max: 500 });
+  const source_ref = V.text(b.source_ref ?? old.source_ref, 'Source', { max: 200 });
+  const item_type = V.oneOf(b.item_type ?? old.item_type, 'Type', ['document', 'fasting', 'task', 'info']);
+  const phase = V.oneOf(b.phase ?? old.phase, 'Phase', ['before', 'during', 'after']);
   const created = await db.transaction(async (tx) => {
     await tx.query('UPDATE test_instructions SET is_current = false, updated_at = now() WHERE id = $1', [old.id]);
     return (await tx.query(
@@ -341,21 +396,31 @@ app.get('/api/v1/departments/:id/slots', auth(), async (req, res) => {
 });
 
 app.post('/api/v1/slots/generate', auth('admin'), async (req, res) => {
-  const { department_id, from, to, start_time = '09:00', end_time = '13:00', interval_min = 30, capacity = 4 } = req.body || {};
-  if (!department_id || !from || !to) fail(400, 'Department and date range are required.');
-  const step = Math.max(5, Number(interval_min) || 30);
+  const b = req.body || {};
+  if (!b.department_id || !(await one('SELECT 1 FROM departments WHERE id = $1', [b.department_id]))) fail(400, 'Choose a department.');
+  const from = V.date(b.from, 'From date');
+  const to = V.date(b.to, 'To date');
+  if (to < from) fail(400, 'The end date is before the start date.');
+  if (to < localDate()) fail(400, 'That date range is in the past.');
+  if ((new Date(`${to}T00:00:00`) - new Date(`${from}T00:00:00`)) / 864e5 > 60) fail(400, 'Generate at most 60 days at a time.');
+  const start = V.time(b.start_time ?? '09:00', 'Start time');
+  const end = V.time(b.end_time ?? '13:00', 'End time');
+  if (end <= start) fail(400, 'End time must be after start time.');
+  const step = V.int(b.interval_min, 'Interval', { min: 5, max: 240, fallback: 30 });
+  const capacity = V.int(b.capacity, 'Patients per slot', { min: 1, max: 50, fallback: 4 });
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
   let created = 0;
   await db.transaction(async (tx) => {
     for (let d = new Date(`${from}T00:00:00`); d <= new Date(`${to}T00:00:00`); d.setDate(d.getDate() + 1)) {
-      const [sh, sm] = start_time.split(':').map(Number);
-      const [eh, em] = end_time.split(':').map(Number);
       for (let m = sh * 60 + sm; m < eh * 60 + em; m += step) {
         const at = new Date(d);
         at.setHours(Math.floor(m / 60), m % 60, 0, 0);
+        if (at <= new Date()) continue; // no slots in the past
         const r = await tx.query(
           `INSERT INTO slots (department_id, starts_at, capacity) VALUES ($1, $2, $3)
            ON CONFLICT (department_id, starts_at) DO NOTHING`,
-          [department_id, at.toISOString(), Number(capacity) || 4]
+          [b.department_id, at.toISOString(), capacity]
         );
         created += r.affectedRows ?? 0;
       }
@@ -377,13 +442,18 @@ app.get('/api/v1/users', auth('admin'), async (req, res) => {
 });
 
 app.post('/api/v1/users', auth('admin'), async (req, res) => {
-  const { full_name, email, password, role = 'staff', department_id = null } = req.body || {};
-  if (!full_name || !email || !password) fail(400, 'Name, email and a temporary password are required.');
-  if (!['staff', 'admin'].includes(role)) fail(400, 'Role must be staff or admin.');
-  if (await one('SELECT 1 FROM users WHERE lower(email) = lower($1)', [email])) fail(409, 'Email already in use.');
+  const b = req.body || {};
+  const fullName = V.text(b.full_name, 'Full name', { max: 100 });
+  const email = V.email(b.email);
+  const password = V.password(b.password);
+  const role = V.oneOf(b.role ?? 'staff', 'Role', ['staff', 'admin']);
+  const departmentId = b.department_id || null;
+  if (role === 'staff' && !departmentId) fail(400, 'Staff need a department to run its queue.');
+  if (departmentId && !(await one('SELECT 1 FROM departments WHERE id = $1', [departmentId]))) fail(400, 'That department doesn’t exist.');
+  if (await one('SELECT 1 FROM users WHERE lower(email) = $1', [email])) fail(409, 'Email already in use.');
   const u = await one(
-    `INSERT INTO users (role, full_name, email, password_hash, department_id) VALUES ($1, $2, lower($3), $4, $5) RETURNING *`,
-    [role, full_name, email, await bcrypt.hash(password, 10), department_id || null]
+    `INSERT INTO users (role, full_name, email, password_hash, department_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [role, fullName, email, await bcrypt.hash(password, 10), departmentId]
   );
   res.status(201).json(publicUser(u));
 });
@@ -391,6 +461,12 @@ app.post('/api/v1/users', auth('admin'), async (req, res) => {
 app.patch('/api/v1/users/:id', auth('admin'), async (req, res) => {
   const { is_active, department_id } = req.body || {};
   if (req.params.id === req.user.id && is_active === false) fail(400, 'You cannot disable your own account.');
+  if (is_active !== undefined && typeof is_active !== 'boolean') fail(400, 'is_active must be true or false.');
+  if (department_id !== undefined) {
+    const target = await one('SELECT role FROM users WHERE id = $1', [req.params.id]);
+    if (target?.role === 'staff' && !department_id) fail(400, 'Staff need a department to run its queue.');
+    if (department_id && !(await one('SELECT 1 FROM departments WHERE id = $1', [department_id]))) fail(400, 'That department doesn’t exist.');
+  }
   const u = await one(
     `UPDATE users SET is_active = COALESCE($2, is_active),
             department_id = CASE WHEN $3::boolean THEN $4::uuid ELSE department_id END, updated_at = now()
@@ -404,8 +480,9 @@ app.patch('/api/v1/users/:id', auth('admin'), async (req, res) => {
 // ---------- visits & readiness ----------
 
 app.post('/api/v1/visits', auth('patient'), async (req, res) => {
-  const { slot_id, test_id = null, reason = null, symptom_session_id = null } = req.body || {};
+  const { slot_id, test_id = null, symptom_session_id = null } = req.body || {};
   if (!slot_id) fail(400, 'Choose a time slot.');
+  const reason = V.text(req.body?.reason, 'Reason', { max: 500, required: false });
   const visitId = await db.transaction(async (tx) => {
     const slot = await one('SELECT * FROM slots WHERE id = $1', [slot_id], tx);
     if (!slot) fail(404, 'Slot not found.');
@@ -492,8 +569,13 @@ app.patch('/api/v1/visits/:id', auth(), async (req, res) => {
     if (status !== 'cancelled') fail(403, 'Patients can only cancel a visit.');
     if (v.status !== 'booked') fail(400, 'Only a booked visit that has not checked in can be cancelled.');
   }
-  const allowed = ['booked', 'checked_in', 'in_service', 'completed', 'no_show', 'cancelled'];
-  if (!allowed.includes(status)) fail(400, 'Unknown status.');
+  // Check-in, start and finish go through the queue so tokens stay in step. Here staff can only
+  // cancel a booked visit or mark it a no-show, and only before it has started.
+  if (isStaff(req.user)) {
+    if (!['cancelled', 'no_show'].includes(status)) fail(400, 'Use the queue to check in, start or finish a visit.');
+    if (v.status !== 'booked') fail(400, `This visit is already ${v.status.replace('_', ' ')}.`);
+    if (status === 'no_show' && new Date(v.starts_at) > new Date()) fail(400, 'A visit can only be marked as a no-show after its time has passed.');
+  }
   await db.transaction(async (tx) => {
     await q('UPDATE visits SET status = $2, updated_at = now() WHERE id = $1', [v.id, status], tx);
     if (status === 'cancelled' && v.status !== 'cancelled') {
@@ -525,7 +607,7 @@ app.get('/api/v1/visits/:id/checklists/:kind', auth(), async (req, res) => {
 
 app.patch('/api/v1/checklist-items/:id', auth(), async (req, res) => {
   const item = await one(
-    `SELECT ci.*, c.visit_id, c.kind, v.patient_id FROM checklist_items ci
+    `SELECT ci.*, c.visit_id, c.kind, v.patient_id, v.status AS visit_status FROM checklist_items ci
        JOIN checklists c ON c.id = ci.checklist_id JOIN visits v ON v.id = c.visit_id WHERE ci.id = $1`,
     [req.params.id]
   );
@@ -534,6 +616,9 @@ app.patch('/api/v1/checklist-items/:id', auth(), async (req, res) => {
   const { access, permission } = await accessTo(req.user, item.patient_id);
   const allowed = access === 'owner' || (access === 'caregiver' && permission === 'view_and_tick' && item.kind === 'post_visit');
   if (!allowed) fail(403, 'You can’t tick items on this checklist.');
+  if (item.kind === 'pre_visit' && !['booked', 'checked_in'].includes(item.visit_status)) fail(400, 'This visit is over, so its preparation checklist is closed.');
+  if (item.kind === 'post_visit' && item.visit_status === 'cancelled') fail(400, 'This visit was cancelled.');
+  if (item.item_type === 'info') fail(400, 'Information items don’t need ticking.');
   const done = !!req.body?.is_done;
   await q(
     `UPDATE checklist_items SET is_done = $2, done_by = $3, updated_at = now() WHERE id = $1`,
@@ -780,15 +865,25 @@ app.get('/api/v1/symptom-rules', auth('admin'), async (req, res) => {
 });
 
 app.post('/api/v1/symptom-rules', auth('admin'), async (req, res) => {
-  const { symptom_key, synonyms = [], is_red_flag = false, department_id = null, urgency, reviewed_by = null } = req.body || {};
-  if (!symptom_key || !urgency) fail(400, 'Symptom key and urgency are required.');
-  const key = symptom_key.trim().toLowerCase().replace(/\s+/g, '_');
-  if (await one('SELECT 1 FROM symptom_rules WHERE symptom_key = $1', [key])) fail(409, 'That symptom key already exists.');
+  const b = req.body || {};
+  const redFlag = b.is_red_flag === true;
+  const key = V.text(b.symptom_key, 'Symptom', { max: 60 }).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  if (!key) fail(400, 'Use letters or numbers for the symptom name.');
+  const synonyms = [...new Set((Array.isArray(b.synonyms) ? b.synonyms : []).map((s) => String(s).trim().toLowerCase()).filter(Boolean))];
+  if (!synonyms.length) fail(400, 'Add at least one phrase to match.');
+  if (synonyms.length > 20 || synonyms.some((s) => s.length > 60)) fail(400, 'Use up to 20 phrases of 60 characters or fewer.');
+  let departmentId = null;
+  let urgency = 'emergency';
+  if (!redFlag) {
+    urgency = V.oneOf(b.urgency, 'Urgency', ['same_day', 'within_week', 'routine']);
+    departmentId = b.department_id || null;
+    if (!departmentId || !(await one('SELECT 1 FROM departments WHERE id = $1', [departmentId]))) fail(400, 'Choose a department.');
+  }
+  if (await one('SELECT 1 FROM symptom_rules WHERE symptom_key = $1', [key])) fail(409, 'That symptom already has a rule.');
   res.status(201).json(await one(
     `INSERT INTO symptom_rules (symptom_key, synonyms, is_red_flag, department_id, urgency, reviewed_by)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [key, synonyms.map((s) => s.trim().toLowerCase()).filter(Boolean), !!is_red_flag,
-     is_red_flag ? null : department_id, is_red_flag ? 'emergency' : urgency, reviewed_by || null]
+    [key, synonyms, redFlag, departmentId, urgency, V.text(b.reviewed_by, 'Reviewed by', { max: 100, required: false })]
   ));
 });
 
@@ -807,6 +902,11 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Not found.' }));
 app.use((err, req, res, next) => {
   if (err instanceof HttpError || Number.isInteger(err?.status)) return res.status(err.status).json({ error: err.message });
   if (err?.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON.' });
+  // Database errors caused by bad input (a malformed id, a missing reference, a duplicate)
+  // are the caller's mistake, not a server failure.
+  const pg = { '22P02': [404, 'Not found.'], '22007': [400, 'Invalid date.'], '22008': [400, 'Invalid date.'],
+    '23503': [400, 'That refers to something that doesn’t exist.'], '23505': [409, 'That already exists.'], '23514': [400, 'Invalid value.'] }[err?.code];
+  if (pg) return res.status(pg[0]).json({ error: pg[1] });
   console.error(err);
   res.status(500).json({ error: 'Something went wrong on our side.' });
 });

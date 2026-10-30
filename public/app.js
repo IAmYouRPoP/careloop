@@ -69,16 +69,16 @@ function shell(path) {
   const best = matches.sort((a, b) => b.length - a.length)[0];
   const active = (href) => href.slice(1) === best;
   return `
-    <header class="bg-white/90 backdrop-blur border-b border-slate-200 sticky top-0 z-40">
-      <div class="max-w-6xl mx-auto px-4 py-2 sm:py-0 sm:h-14 flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-1">
-        <a href="${homeFor(S.user)}" class="flex items-center gap-2 font-bold text-lg shrink-0">
-          <svg viewBox="0 0 32 32" class="h-7 w-7" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#0f766e"/><path d="M9 16h4l2-5 3 10 2-5h3" stroke="white" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <header class="site-header sticky top-0 z-40 border-b backdrop-blur-md">
+      <div class="max-w-6xl mx-auto px-4 py-2 lg:py-0 lg:h-16 flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1">
+        <a href="${homeFor(S.user)}" class="flex items-center gap-2.5 font-semibold text-[1.05rem] tracking-tight shrink-0">
+          <svg viewBox="0 0 32 32" class="h-8 w-8 drop-shadow-sm" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14b8a6"/><stop offset="1" stop-color="#0f766e"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="9" fill="url(#lg)"/><path d="M8.5 16h4l2.2-5.2 3.2 10.4 2.2-5.2h3.4" stroke="white" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
           CareLoop
         </a>
-        <nav class="order-last w-full sm:order-none sm:w-auto sm:flex-1 min-w-0 flex gap-1 overflow-x-auto -mx-1 px-1" aria-label="Main">
+        <nav class="no-scrollbar order-last w-full lg:order-none lg:w-auto lg:flex-1 min-w-0 flex gap-1 overflow-x-auto -mx-1 px-1 pb-1 lg:pb-0" aria-label="Main">
           ${links.map(([href, label]) => `<a href="${href}" class="nav-link ${active(href) ? 'active' : ''}">${t(label)}</a>`).join('')}
         </nav>
-        <div class="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
+        <div class="flex items-center gap-2 shrink-0 ml-auto lg:ml-0">
           ${S.user?.role && S.user.role !== 'patient' ? '' : `<button id="lang" class="btn btn-ghost btn-sm" title="Language / भाषा">${getLang() === 'hi' ? 'English' : 'हिन्दी'}</button>`}
           <button id="theme" class="btn btn-ghost btn-sm" aria-label="Switch light or dark mode" title="Light / dark">◐</button>
           ${S.user ? `
@@ -87,8 +87,10 @@ function shell(path) {
         </div>
       </div>
     </header>
-    <main id="view" class="max-w-6xl mx-auto px-4 py-6"></main>
-    <footer class="max-w-6xl mx-auto px-4 pb-8 text-xs text-slate-400">${t(SYNTHETIC_NOTE)} ${t('In an emergency call 112 or 108.')}</footer>`;
+    <main id="view" class="max-w-6xl mx-auto px-4 py-8"></main>
+    <footer class="max-w-6xl mx-auto px-4 pb-10 pt-6 mt-4 border-t border-slate-200/70 text-xs text-slate-400 flex flex-wrap justify-between gap-2">
+      <span>${t(SYNTHETIC_NOTE)}</span><span>${t('In an emergency call 112 or 108.')}</span>
+    </footer>`;
 }
 
 async function render() {

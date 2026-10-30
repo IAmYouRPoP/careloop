@@ -146,7 +146,8 @@ export const itemBadge = (t) => badge(...(ITEM[t] || [t, 'gray']));
 
 export function toast(message, kind = 'ok') {
   const el = document.createElement('div');
-  el.className = `max-w-sm rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${kind === 'error' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'}`;
+  el.className = `max-w-sm rounded-xl px-4 py-3 text-sm font-medium shadow-xl ring-1 ring-black/5 ${kind === 'error' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'}`;
+  el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
   el.textContent = message;
   document.getElementById('toasts').appendChild(el);
   setTimeout(() => el.remove(), 4000);
@@ -161,16 +162,16 @@ export async function busy(btn, fn) {
 }
 
 export const pageTitle = (title, sub = '', actions = '') => `
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight">${t(title)}</h1>
-      ${sub ? `<p class="text-slate-500 mt-1">${t(sub)}</p>` : ''}
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-7">
+    <div class="min-w-0">
+      <h1 class="text-[1.65rem] leading-tight font-semibold tracking-tight text-slate-900">${t(title)}</h1>
+      ${sub ? `<p class="text-slate-500 mt-1.5 max-w-2xl">${t(sub)}</p>` : ''}
     </div>
     ${actions ? `<div class="flex flex-wrap gap-2">${actions}</div>` : ''}
   </div>`;
 
 export const empty = (text, action = '') =>
-  `<div class="card p-8 text-center text-slate-500"><p>${t(text)}</p>${action ? `<div class="mt-4">${action}</div>` : ''}</div>`;
+  `<div class="card p-10 text-center text-slate-500 border-dashed shadow-none"><p class="max-w-md mx-auto">${t(text)}</p>${action ? `<div class="mt-5">${action}</div>` : ''}</div>`;
 
 export const formData = (form) => Object.fromEntries(new FormData(form).entries());
 

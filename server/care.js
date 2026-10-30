@@ -6,6 +6,8 @@ import {
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const HM = /^([01]\d|2[0-3]):[0-5]\d$/;
+// A real calendar date: rejects 2026-02-30.
+const realDate = (s) => YMD.test(s || '') && localDate(new Date(`${s}T00:00:00`)) === s;
 
 export function registerCareRoutes(app, { auth, fail, visitFor, io }) {
   const baseUrl = (req) => `${req.protocol}://${req.get('host')}`;
@@ -26,6 +28,8 @@ export function registerCareRoutes(app, { auth, fail, visitFor, io }) {
     if (!/^\S+@\S+\.\S+$/.test(email)) fail(400, 'Enter a valid email address.');
     const me = await one('SELECT email, full_name FROM users WHERE id = $1', [req.user.id]);
     if (me.email === email) fail(400, 'You can’t invite yourself.');
+    const existing = await one('SELECT role FROM users WHERE email = $1', [email]);
+    if (existing && existing.role !== 'patient') fail(400, 'That email belongs to a hospital staff account, which can’t be a caregiver.');
     if (await one(`SELECT 1 FROM caregiver_links WHERE patient_id = $1 AND invite_email = $2 AND status <> 'revoked'`, [req.user.id, email])) {
       fail(409, 'You’ve already invited this person.');
     }
@@ -47,10 +51,10 @@ export function registerCareRoutes(app, { auth, fail, visitFor, io }) {
     if (status && status !== 'revoked') fail(400, 'You can only revoke access.');
     const link = await one(
       `UPDATE caregiver_links SET permission = COALESCE($3, permission), status = COALESCE($4, status), updated_at = now()
-        WHERE id = $1 AND patient_id = $2 RETURNING *`,
+        WHERE id = $1 AND patient_id = $2 AND status <> 'revoked' RETURNING *`,
       [req.params.id, req.user.id, permission || null, status || null]
     );
-    if (!link) fail(404, 'Caregiver not found.');
+    if (!link) fail(404, 'Caregiver not found, or access was already removed.');
     if (status === 'revoked' && link.caregiver_id) {
       // Stop future reminders going to someone who no longer has access.
       await q(
@@ -139,12 +143,16 @@ export function registerCareRoutes(app, { auth, fail, visitFor, io }) {
   // unfinished items; items the patient already ticked are kept.
   app.post('/api/v1/visits/:id/follow-up', auth('staff', 'admin'), async (req, res) => {
     const v = await visitFor(req);
-    if (!['in_service', 'completed', 'checked_in'].includes(v.status)) fail(400, 'Discharge details can be added once the patient has been seen.');
+    if (!['in_service', 'completed'].includes(v.status)) fail(400, 'Discharge details can be added once the patient has been seen.');
     const notes = String(req.body?.notes || '').trim();
+    if (notes.length > 2000) fail(400, 'Notes must be 2000 characters or fewer.');
     const date = req.body?.follow_up_date || null;
-    const tasks = (Array.isArray(req.body?.tasks) ? req.body.tasks : []).map((t) => String(t).trim()).filter(Boolean).slice(0, 30);
-    if (date && !YMD.test(date)) fail(400, 'Follow-up date is not valid.');
-    if (date && date < localDate()) fail(400, 'Follow-up date is in the past.');
+    const tasks = [...new Set((Array.isArray(req.body?.tasks) ? req.body.tasks : []).map((t) => String(t).trim()).filter(Boolean))];
+    if (tasks.length > 30) fail(400, 'Add at most 30 tasks.');
+    if (tasks.some((t) => t.length > 200)) fail(400, 'Each task must be 200 characters or fewer.');
+    if (date && !realDate(date)) fail(400, 'Follow-up date is not valid.');
+    if (date && date <= localDate()) fail(400, 'Follow-up date must be after today.');
+    if (date && date > localDate(new Date(Date.now() + 366 * 864e5))) fail(400, 'Follow-up date must be within a year.');
 
     await db.transaction(async (tx) => {
       const existing = await one('SELECT id FROM follow_ups WHERE visit_id = $1', [v.id], tx);
@@ -186,9 +194,14 @@ export function registerCareRoutes(app, { auth, fail, visitFor, io }) {
       .map((t) => String(t).trim()).filter(Boolean);
     const { start_date, end_date } = body || {};
     if (!name || !dose_text) fail(400, 'Medicine name and dose instructions are required.');
+    if (name.length > 100 || dose_text.length > 200) fail(400, 'Keep the name under 100 and the dose under 200 characters.');
     if (!times.length || !times.every((t) => HM.test(t))) fail(400, 'Enter dose times as HH:MM, for example 08:00, 20:00.');
-    if (!YMD.test(start_date || '') || !YMD.test(end_date || '')) fail(400, 'Start and end dates are required.');
+    if (times.length > 8) fail(400, 'Use at most 8 dose times a day.');
+    if (!start_date || !end_date) fail(400, 'Start and end dates are required.');
+    if (!realDate(start_date) || !realDate(end_date)) fail(400, 'Enter real calendar dates for the start and end.');
     if (end_date < start_date) fail(400, 'End date is before the start date.');
+    if (end_date < localDate()) fail(400, 'This schedule has already ended. Check the end date.');
+    if (start_date < localDate(new Date(Date.now() - 30 * 864e5))) fail(400, 'The start date is more than 30 days ago.');
     if ((new Date(end_date) - new Date(start_date)) / 864e5 > 90) fail(400, 'Schedules longer than 90 days aren’t supported yet.');
     return { name, dose_text, times: [...new Set(times)].sort(), start_date, end_date };
   }

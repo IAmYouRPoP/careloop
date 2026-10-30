@@ -6,7 +6,10 @@ import {
 } from './lib.js';
 import { offerBanner } from './insights.js';
 
-export const homeFor = (u) => (!u ? '#/' : u.role === 'patient' ? '#/home' : u.role === 'admin' ? '#/admin/analytics' : '#/staff');
+// Oldest date of birth the forms accept (120 years ago); the server enforces the same range.
+const dobMin = () => { const d = new Date(); d.setFullYear(d.getFullYear() - 120); return localDate(d); };
+
+export const homeFor =(u) => (!u ? '#/' : u.role === 'patient' ? '#/home' : u.role === 'admin' ? '#/admin/analytics' : '#/staff');
 
 // ---------- landing ----------
 
@@ -19,17 +22,17 @@ export async function landing(el) {
       <div class="text-sm font-semibold text-brand-700 mt-3">${t(cta)} →</div>
     </a>`;
   el.innerHTML = `
-    <section class="py-10 sm:py-16 grid lg:grid-cols-2 gap-10 items-center">
+    <section class="hero-glow -mx-4 -mt-8 px-4 pt-14 pb-16 sm:pt-20 sm:pb-20 grid lg:grid-cols-2 gap-12 items-center rounded-b-[2rem]">
       <div>
         ${badge('Synthetic demo', 'amber')}
-        <h1 class="text-4xl sm:text-5xl font-bold tracking-tight mt-4 leading-tight">${t('From “what’s wrong?” to “what do I do next?”')}</h1>
-        <p class="text-lg text-slate-600 mt-4">${t('CareLoop guides you before, during and after a hospital visit: the right department, a checklist so you arrive ready, and a live queue so you know your turn.')}</p>
-        <div class="flex flex-wrap gap-3 mt-6">
+        <h1 class="text-4xl sm:text-[3.25rem] font-semibold tracking-tight mt-5 leading-[1.08] text-slate-900">${t('From “what’s wrong?” to “what do I do next?”')}</h1>
+        <p class="text-lg text-slate-600 mt-5 max-w-xl leading-relaxed">${t('CareLoop guides you before, during and after a hospital visit: the right department, a checklist so you arrive ready, and a live queue so you know your turn.')}</p>
+        <div class="flex flex-wrap gap-3 mt-8">
           <a href="#/symptoms" class="btn btn-primary">${t('Find the right department')}</a>
           ${S.user ? `<a href="${homeFor(S.user)}" class="btn btn-ghost">${t('Go to my dashboard')}</a>` : `<a href="#/signup" class="btn btn-ghost">${t('Create an account')}</a>`}
         </div>
       </div>
-      <div class="card p-6 shadow-sm" aria-hidden="true">
+      <div class="card p-6 lg:ml-6 shadow-xl ring-1 ring-slate-900/5 rotate-[0.6deg]" aria-hidden="true">
         <div class="flex items-center justify-between">
           <div><div class="text-xs text-slate-500">${t('Your token')}</div><div class="text-3xl font-bold">GEN-006</div></div>
           ${badge('Waiting', 'blue')}
@@ -41,7 +44,7 @@ export async function landing(el) {
         <div class="mt-4 rounded-xl bg-emerald-50 text-emerald-800 text-sm p-3">✓ ${t('You’re ready.')} ${t('All documents and fasting steps are confirmed.')}</div>
       </div>
     </section>
-    <section class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pb-12">
+    <section class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-10 pb-6">
       ${stage('Find care', 'Symptom guide', 'Describe how you feel; get a department and how soon to go. Emergencies are flagged first.', '#/symptoms', 'Try it')}
       ${stage('Before', 'Readiness check', 'A checklist from the hospital’s own instructions, with flags for missing documents and fasting.', S.user ? '#/book' : '#/login', 'Book a visit')}
       ${stage('During', 'Live queue', 'Check in from your phone, see your position and an honest wait estimate.', S.user ? '#/visits' : '#/login', 'See my visits')}
@@ -100,13 +103,13 @@ export async function signup(el) {
         <h1 class="text-2xl font-bold">Create a patient account</h1>
         <p class="text-slate-500 text-sm mt-1">Staff accounts are created by the hospital admin.</p>
         <form id="f" class="mt-6 space-y-4">
-          <div><label class="label" for="n">Full name</label><input class="input" id="n" name="full_name" required autocomplete="name" /></div>
+          <div><label class="label" for="n">${t('Full name')}</label><input class="input" id="n" name="full_name" required maxlength="100" autocomplete="name" /></div>
           <div><label class="label" for="e">Email</label><input class="input" id="e" name="email" type="email" required autocomplete="email" /></div>
           <div class="grid grid-cols-2 gap-3">
             <div><label class="label" for="ph">Phone <span class="font-normal text-slate-400">(optional)</span></label><input class="input" id="ph" name="phone" autocomplete="tel" /></div>
-            <div><label class="label" for="dob">Date of birth</label><input class="input" id="dob" name="date_of_birth" type="date" /></div>
+            <div><label class="label" for="dob">${t('Date of birth')}</label><input class="input" id="dob" name="date_of_birth" type="date" min="${dobMin()}" max="${localDate()}" /></div>
           </div>
-          <div><label class="label" for="p">Password</label><input class="input" id="p" name="password" type="password" minlength="8" required autocomplete="new-password" /><p class="text-xs text-slate-500 mt-1">At least 8 characters.</p></div>
+          <div><label class="label" for="p">${t('Password')}</label><input class="input" id="p" name="password" type="password" minlength="8" maxlength="72" required autocomplete="new-password" /><p class="text-xs text-slate-500 mt-1">At least 8 characters.</p></div>
           <button class="btn btn-primary w-full">Create account</button>
         </form>
         <p class="text-sm text-slate-500 mt-4">Already registered? <a href="#/login" class="text-brand-700 font-semibold">Log in</a></p>
@@ -129,10 +132,10 @@ export async function profile(el) {
   el.innerHTML = `
     ${pageTitle('Profile', esc(me.email))}
     <form id="f" class="card p-6 max-w-xl space-y-4">
-      <div><label class="label" for="n">Full name</label><input class="input" id="n" name="full_name" value="${esc(me.full_name)}" required /></div>
+      <div><label class="label" for="n">${t('Full name')}</label><input class="input" id="n" name="full_name" value="${esc(me.full_name)}" required maxlength="100" autocomplete="name" /></div>
       <div class="grid sm:grid-cols-2 gap-3">
         <div><label class="label" for="ph">Phone</label><input class="input" id="ph" name="phone" value="${esc(me.phone || '')}" placeholder="+91 98765 43210" autocomplete="tel" /></div>
-        <div><label class="label" for="dob">Date of birth</label><input class="input" id="dob" name="date_of_birth" type="date" value="${me.date_of_birth ? localDate(new Date(me.date_of_birth)) : ''}" /></div>
+        <div><label class="label" for="dob">${t('Date of birth')}</label><input class="input" id="dob" name="date_of_birth" type="date" min="${dobMin()}" max="${localDate()}" value="${esc(me.dob_ymd || '')}" /></div>
       </div>
       <div class="text-sm text-slate-500">Role: ${badge(me.role, 'teal')} ${me.department_name ? `· ${esc(me.department_name)}` : ''}</div>
       <button class="btn btn-primary">Save changes</button>

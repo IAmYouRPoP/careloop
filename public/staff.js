@@ -266,9 +266,9 @@ export async function adminDepartments(el) {
         <thead><tr><th>Name</th><th>Location</th><th>Default min / patient</th><th>Status</th><th></th></tr></thead>
         <tbody>${departments.map((d) => `
           <tr data-id="${d.id}">
-            <td><input class="input" name="name" value="${esc(d.name)}" /></td>
-            <td><input class="input" name="location" value="${esc(d.location)}" /></td>
-            <td><input class="input w-24" name="default_service_minutes" type="number" min="1" max="120" value="${d.default_service_minutes}" /></td>
+            <td><input class="input" name="name" value="${esc(d.name)}" required maxlength="80" aria-label="Name" /></td>
+            <td><input class="input" name="location" value="${esc(d.location)}" maxlength="120" aria-label="Location" /></td>
+            <td><input class="input w-24" name="default_service_minutes" type="number" min="1" max="240" step="1" value="${d.default_service_minutes}" aria-label="Minutes per patient" /></td>
             <td>${d.is_active ? badge('Active', 'green') : badge('Hidden', 'gray')}</td>
             <td class="text-right whitespace-nowrap">
               <button class="save btn btn-ghost btn-sm">Save</button>
@@ -279,9 +279,9 @@ export async function adminDepartments(el) {
       </table>
     </div>
     <form id="add" class="card p-5 mt-6 grid sm:grid-cols-5 gap-3 items-end">
-      <div class="sm:col-span-2"><label class="label" for="dn">New department</label><input class="input" id="dn" name="name" required /></div>
-      <div><label class="label" for="dl">Location</label><input class="input" id="dl" name="location" /></div>
-      <div><label class="label" for="dm">Min / patient</label><input class="input" id="dm" name="default_service_minutes" type="number" value="10" min="1" /></div>
+      <div class="sm:col-span-2"><label class="label" for="dn">New department</label><input class="input" id="dn" name="name" required maxlength="80" /></div>
+      <div><label class="label" for="dl">Location</label><input class="input" id="dl" name="location" maxlength="120" /></div>
+      <div><label class="label" for="dm">Min / patient</label><input class="input" id="dm" name="default_service_minutes" type="number" value="10" min="1" max="240" step="1" required /></div>
       <button class="btn btn-primary">Add</button>
     </form>`;
   el.querySelectorAll('tr[data-id]').forEach((row) => {
@@ -323,10 +323,10 @@ export async function adminTests(el) {
         <form id="addtest" class="card p-4 space-y-3">
           <div class="font-semibold text-sm">Add a test</div>
           <select class="input" name="department_id" required aria-label="Department"><option value="">Department</option>${departments.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select>
-          <input class="input" name="name" placeholder="Test name" required />
+          <input class="input" name="name" placeholder="Test name" required maxlength="100" aria-label="Test name" />
           <input class="input" name="required_documents" placeholder="Documents, comma-separated" />
           <div class="flex gap-2 items-center"><label class="text-sm flex items-center gap-2"><input type="checkbox" name="requires_fasting" class="accent-teal-700" /> Fasting</label>
-            <input class="input w-24" name="fasting_hours" type="number" min="1" max="24" placeholder="hours" /></div>
+            <input class="input w-24" name="fasting_hours" type="number" min="1" max="24" step="1" placeholder="hours" aria-label="Fasting hours" /></div>
           <button class="btn btn-primary w-full">Add test</button>
         </form>
       </aside>
@@ -348,9 +348,9 @@ export async function adminTests(el) {
             <div class="font-semibold text-sm">Add a verified instruction</div>
             <div class="grid sm:grid-cols-3 gap-3">
               <select class="input" name="item_type" aria-label="Type"><option value="document">Document to bring</option><option value="fasting">Fasting</option><option value="task">Task</option><option value="info">Good to know</option></select>
-              <input class="input sm:col-span-2" name="source_ref" placeholder="Source, e.g. Lab instruction sheet v3, p.2" required />
+              <input class="input sm:col-span-2" name="source_ref" placeholder="Source, e.g. Lab instruction sheet v3, p.2" required maxlength="200" aria-label="Source" />
             </div>
-            <textarea class="input" name="text" rows="2" placeholder="Exact wording from the hospital’s instruction" required></textarea>
+            <textarea class="input" name="text" rows="2" placeholder="Exact wording from the hospital’s instruction" required maxlength="500" aria-label="Instruction text"></textarea>
             <button class="btn btn-primary">Add instruction</button>
             <p class="text-xs text-slate-500">New instructions apply to visits booked from now on.</p>
           </form>` : empty('Add a test to get started.')}
@@ -397,12 +397,12 @@ export async function adminSlots(el) {
     ${pageTitle('Slot planner', 'Create bookable time slots. Existing slots are left as they are.')}
     <form id="f" class="card p-6 max-w-2xl grid sm:grid-cols-2 gap-4">
       <div class="sm:col-span-2"><label class="label" for="d">Department</label><select class="input" id="d" name="department_id" required>${departments.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select></div>
-      <div><label class="label" for="fr">From</label><input class="input" id="fr" type="date" name="from" value="${today}" required /></div>
-      <div><label class="label" for="to">To</label><input class="input" id="to" type="date" name="to" value="${localDate(new Date(Date.now() + 6 * 864e5))}" required /></div>
+      <div><label class="label" for="fr">From</label><input class="input" id="fr" type="date" name="from" value="${today}" min="${today}" required /></div>
+      <div><label class="label" for="to">To</label><input class="input" id="to" type="date" name="to" value="${localDate(new Date(Date.now() + 6 * 864e5))}" min="${today}" required /></div>
       <div><label class="label" for="st">Start time</label><input class="input" id="st" type="time" name="start_time" value="09:00" required /></div>
       <div><label class="label" for="et">End time</label><input class="input" id="et" type="time" name="end_time" value="13:00" required /></div>
-      <div><label class="label" for="iv">Every (minutes)</label><input class="input" id="iv" type="number" name="interval_min" value="30" min="5" /></div>
-      <div><label class="label" for="cap">Patients per slot</label><input class="input" id="cap" type="number" name="capacity" value="4" min="1" /></div>
+      <div><label class="label" for="iv">Every (minutes)</label><input class="input" id="iv" type="number" name="interval_min" value="30" min="5" max="240" step="1" required /></div>
+      <div><label class="label" for="cap">Patients per slot</label><input class="input" id="cap" type="number" name="capacity" value="4" min="1" max="50" step="1" required /></div>
       <div class="sm:col-span-2"><button class="btn btn-primary">Generate slots</button></div>
     </form>`;
   el.querySelector('#f').addEventListener('submit', (e) => {
@@ -436,9 +436,9 @@ export async function adminStaff(el) {
     </div>
     <form id="add" class="card p-5 mt-6 grid sm:grid-cols-3 gap-3">
       <div class="sm:col-span-3 font-semibold text-sm">Add a staff account</div>
-      <input class="input" name="full_name" placeholder="Full name" required />
+      <input class="input" name="full_name" placeholder="Full name" required maxlength="100" aria-label="Full name" />
       <input class="input" name="email" type="email" placeholder="Email" required />
-      <input class="input" name="password" type="password" minlength="8" placeholder="Temporary password" required autocomplete="new-password" />
+      <input class="input" name="password" type="password" minlength="8" maxlength="72" placeholder="Temporary password" required autocomplete="new-password" aria-label="Temporary password" />
       <select class="input" name="role" aria-label="Role"><option value="staff">Staff</option><option value="admin">Admin</option></select>
       <select class="input" name="department_id" aria-label="Department">${deptOptions(null)}</select>
       <button class="btn btn-primary">Create account</button>
@@ -486,7 +486,7 @@ export async function adminRules(el) {
     </div>
     <form id="add" class="card p-5 mt-6 grid sm:grid-cols-3 gap-3">
       <div class="sm:col-span-3 font-semibold text-sm">Add a rule</div>
-      <input class="input" name="symptom_key" placeholder="Symptom, e.g. eye pain" required />
+      <input class="input" name="symptom_key" placeholder="Symptom, e.g. eye pain" required maxlength="60" aria-label="Symptom" />
       <input class="input sm:col-span-2" name="synonyms" placeholder="Phrases to match, comma-separated" required />
       <select class="input" name="department_id" aria-label="Department">${departments.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select>
       <select class="input" name="urgency" aria-label="Urgency"><option value="same_day">Today</option><option value="within_week">This week</option><option value="routine">Routine</option></select>

@@ -236,9 +236,9 @@ export async function discharge(el, { id }) {
       <form id="fu" class="card p-5 space-y-4 h-fit">
         <div class="font-semibold">Follow-up and instructions</div>
         <div><label class="label" for="fd">Follow-up date <span class="font-normal text-slate-400">(leave empty if none)</span></label>
-          <input class="input" type="date" id="fd" name="follow_up_date" min="${today}" value="${f?.follow_up_date || ''}" /></div>
+          <input class="input" type="date" id="fd" name="follow_up_date" min="${localDate(new Date(Date.now() + 864e5))}" max="${localDate(new Date(Date.now() + 365 * 864e5))}" value="${f?.follow_up_date || ''}" /></div>
         <div><label class="label" for="fn">Discharge notes for the patient</label>
-          <textarea class="input" id="fn" name="notes" rows="4">${esc(f?.notes || '')}</textarea></div>
+          <textarea class="input" id="fn" name="notes" rows="4" maxlength="2000">${esc(f?.notes || '')}</textarea></div>
         <div><label class="label" for="ft">Recovery tasks <span class="font-normal text-slate-400">(one per line)</span></label>
           <textarea class="input" id="ft" name="tasks" rows="5" placeholder="Rest for 3 days&#10;Drink plenty of fluids">${esc(openTasks.join('\n'))}</textarea>
           ${doneTasks.length ? `<p class="text-xs text-slate-500 mt-1">Already ticked off (kept): ${doneTasks.map((t) => esc(t.text)).join('; ')}</p>` : ''}
@@ -258,12 +258,12 @@ export async function discharge(el, { id }) {
         </div>
         <form id="med" class="card p-5 mt-4 space-y-3 ${f ? '' : 'opacity-50 pointer-events-none'}">
           <div class="font-semibold text-sm">Add a medicine ${f ? '' : '<span class="font-normal text-slate-500">(save the recovery plan first)</span>'}</div>
-          <input class="input" name="name" placeholder="Medicine and strength, e.g. Amoxicillin 500 mg" required />
-          <input class="input" name="dose_text" placeholder="Dose instructions, e.g. 1 capsule after food" required />
+          <input class="input" name="name" placeholder="Medicine and strength, e.g. Amoxicillin 500 mg" required maxlength="100" aria-label="Medicine" />
+          <input class="input" name="dose_text" placeholder="Dose instructions, e.g. 1 capsule after food" required maxlength="200" aria-label="Dose instructions" />
           <div><label class="label" for="mt">Dose times</label><input class="input" id="mt" name="times_of_day" placeholder="08:00, 20:00" required pattern="\\s*([01]\\d|2[0-3]):[0-5]\\d(\\s*,\\s*([01]\\d|2[0-3]):[0-5]\\d)*\\s*" /></div>
           <div class="grid grid-cols-2 gap-3">
-            <div><label class="label" for="ms">From</label><input class="input" id="ms" type="date" name="start_date" value="${today}" required /></div>
-            <div><label class="label" for="me">To</label><input class="input" id="me" type="date" name="end_date" value="${localDate(new Date(Date.now() + 4 * 864e5))}" required /></div>
+            <div><label class="label" for="ms">From</label><input class="input" id="ms" type="date" name="start_date" value="${today}" min="${localDate(new Date(Date.now() - 30 * 864e5))}" required /></div>
+            <div><label class="label" for="me">To</label><input class="input" id="me" type="date" name="end_date" value="${localDate(new Date(Date.now() + 4 * 864e5))}" min="${today}" required /></div>
           </div>
           <button class="btn btn-primary">Add medicine</button>
           <p class="text-xs text-slate-500">Enter it exactly as prescribed. The patient sees this text word for word and gets a reminder at each time.</p>
